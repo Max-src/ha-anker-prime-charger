@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
+from freezegun.api import FrozenDateTimeFactory
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    mock_restore_cache_with_extra_data,
+)
 
 from custom_components.anker_prime_charger.const import DOMAIN
 from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF, STATE_ON, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
@@ -32,6 +38,50 @@ async def test_sensors(hass: HomeAssistant, setup_entry: MockConfigEntry) -> Non
     assert state(hass, "sensor", "usbc_1_power") == "6.3"
     assert state(hass, "sensor", "usba_2_power") == "2.5"
     assert state(hass, "sensor", "total_output_power") == "10.8"
+
+
+async def test_energy(
+    hass: HomeAssistant,
+    cloud: FakeCloud,
+    setup_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Energy adds up the power reported, until the next value arrives."""
+    assert state(hass, "sensor", "usbc_1_energy") == "0.0"
+    assert attr(hass, "sensor", "usbc_1_energy", "state_class") == "total_increasing"
+    assert attr(hass, "sensor", "total_output_energy", "device_class") == "energy"
+
+    freezer.tick(timedelta(hours=1))
+    cloud.mqtt.deliver({"usbc_1_power": 0.0, "usba_1_power": 4.0})
+    await hass.async_block_till_done()
+    # 1 h at the fixture's 6.3 W (C1), 0 + 2.5 W (USB-A), 10.8 W (all)
+    assert state(hass, "sensor", "usbc_1_energy") == "0.0063"
+    assert state(hass, "sensor", "usba_energy") == "0.0025"
+    assert state(hass, "sensor", "total_output_energy") == "0.0108"
+
+    freezer.tick(timedelta(hours=2))
+    cloud.mqtt.deliver({"usba_1_power": 0.0})
+    await hass.async_block_till_done()
+    assert state(hass, "sensor", "usbc_1_energy") == "0.0063"
+    assert state(hass, "sensor", "usba_energy") == "0.0155"  # + 2 h at 6.5 W
+
+
+async def test_energy_is_restored(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """The total continues from where it was before the restart."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State("sensor.250w_prime_charger_usb_c_1_energy", "1.5"),
+                {"native_value": 1.5, "native_unit_of_measurement": "kWh"},
+            )
+        ],
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert state(hass, "sensor", "usbc_1_energy") == "1.5"
 
 
 async def test_all_entities_enabled_by_default(
