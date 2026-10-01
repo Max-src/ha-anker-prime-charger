@@ -1,0 +1,213 @@
+save_custom_profile:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: select
+  fields:
+    profile:
+      required: true
+      example: test 1
+      selector:
+        text:
+    new_name:
+      example: Desk
+      selector:
+        text:
+    from_charger:
+      default: false
+      selector:
+        boolean:
+    auto_deactivation:
+      selector:
+        boolean:
+    c1_power:
+      selector:
+        number:
+          min: 0
+          max: 140
+          unit_of_measurement: W
+          mode: box
+    c2_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    c3_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    c4_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    a_power:
+      selector:
+        select:
+          options:
+          - '0'
+          - '15'
+          - '24'
+    c1_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c2_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c3_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c4_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+create_custom_profile:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: select
+  fields:
+    name:
+      required: true
+      example: Travel
+      selector:
+        text: {}
+    auto_deactivation:
+      selector:
+        boolean:
+    c1_power:
+      selector:
+        number:
+          min: 0
+          max: 140
+          unit_of_measurement: W
+          mode: box
+    c2_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    c3_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    c4_power:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: W
+          mode: box
+    a_power:
+      selector:
+        select:
+          options:
+          - '0'
+          - '15'
+          - '24'
+    c1_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c2_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c3_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+    c4_protocols:
+      selector:
+        select:
+          multiple: true
+          options:
+          - scp
+          - ufcs
+          - pd12v
+          - pps11v
+          - pps16v
+          - pps20v
+          - xiaomi
+delete_custom_profile:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: select
+  fields:
+    profile:
+      required: true
+      example: test 1
+      selector:
+        text:
