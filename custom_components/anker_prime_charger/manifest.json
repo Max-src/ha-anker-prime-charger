@@ -1,7 +1,9 @@
 {
   "domain": "anker_prime_charger",
   "name": "Anker Prime Charger",
-  "codeowners": ["@Max-src"],
+  "codeowners": [
+    "@Max-src"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/Max-src/ha-anker-prime-charger",
@@ -10,7 +12,6 @@
   "issue_tracker": "https://github.com/Max-src/ha-anker-prime-charger/issues",
   "requirements": [
     "aiofiles>=24.1.0",
-    "cryptography>=3.4.8",
     "paho-mqtt>=2.1.0"
   ],
   "version": "0.15.0"
