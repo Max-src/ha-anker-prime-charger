@@ -8,6 +8,7 @@ from freezegun.api import FrozenDateTimeFactory
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
+    async_fire_time_changed,
     mock_restore_cache_with_extra_data,
 )
 
@@ -38,32 +39,47 @@ async def test_sensors(hass: HomeAssistant, setup_entry: MockConfigEntry) -> Non
     assert state(hass, "sensor", "usbc_1_power") == "6.3"
     assert state(hass, "sensor", "usba_2_power") == "2.5"
     assert state(hass, "sensor", "total_output_power") == "10.8"
+    assert attr(hass, "sensor", "usbc_1_power", "max_power") == 140
+    assert attr(hass, "sensor", "usbc_3_power", "max_power") == 100
+    assert attr(hass, "sensor", "usba_2_power", "max_power") == 22.5
+    assert attr(hass, "sensor", "usbc_1_voltage", "max_power") is None
 
 
 async def test_energy(
     hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,  # first: the clock is frozen during setup
     cloud: FakeCloud,
     setup_entry: MockConfigEntry,
-    freezer: FrozenDateTimeFactory,
 ) -> None:
     """Energy adds up the power reported, until the next value arrives."""
     assert state(hass, "sensor", "usbc_1_energy") == "0.0"
     assert attr(hass, "sensor", "usbc_1_energy", "state_class") == "total_increasing"
     assert attr(hass, "sensor", "total_output_energy", "device_class") == "energy"
 
-    freezer.tick(timedelta(hours=1))
-    cloud.mqtt.deliver({"usbc_1_power": 0.0, "usba_1_power": 4.0})
-    await hass.async_block_till_done()
-    # 1 h at the fixture's 6.3 W (C1), 0 + 2.5 W (USB-A), 10.8 W (all)
-    assert state(hass, "sensor", "usbc_1_energy") == "0.0063"
-    assert state(hass, "sensor", "usba_energy") == "0.0025"
-    assert state(hass, "sensor", "total_output_energy") == "0.0108"
+    async def step(values: dict) -> None:
+        # a minute later (polls keep running; the charger stays reachable)
+        freezer.tick(timedelta(minutes=1))
+        cloud.mqtt.deliver(values)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
 
-    freezer.tick(timedelta(hours=2))
-    cloud.mqtt.deliver({"usba_1_power": 0.0})
+    cloud.mqtt.deliver({"usbc_1_power": 60.0, "usba_1_power": 30.0, "usba_2_power": 0})
     await hass.async_block_till_done()
-    assert state(hass, "sensor", "usbc_1_energy") == "0.0063"
-    assert state(hass, "sensor", "usba_energy") == "0.0155"  # + 2 h at 6.5 W
+    # all ports: 60 + 1.5 + 0.5 + 0 (USB-C) + 30 + 0 (USB-A) = 92 W
+    await step({"usbc_1_power": 0.0})
+    assert state(hass, "sensor", "usbc_1_energy") == "0.001"  # 1 min at 60 W
+    assert state(hass, "sensor", "usba_1_energy") == "0.0005"
+    assert state(hass, "sensor", "usba_2_energy") == "0.0"
+    assert state(hass, "sensor", "total_output_energy") == "0.001533"
+
+    await step({"usba_1_power": 0.0})
+    assert state(hass, "sensor", "usbc_1_energy") == "0.001"  # + 1 min at 0 W
+    assert state(hass, "sensor", "usba_1_energy") == "0.001"
+    assert state(hass, "sensor", "total_output_energy") == "0.002067"  # + 32 W
+    assert (
+        attr(hass, "sensor", "usba_2_energy", "friendly_name")
+        == "250W Prime Charger USB-A A2 energy"
+    )
 
 
 async def test_energy_is_restored(

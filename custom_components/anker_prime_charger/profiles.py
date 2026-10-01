@@ -23,11 +23,13 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from . import custom_mode
 from .coordinator import PrimeChargerCoordinator
+from .helpers import translated
+from .ports import PORTS
 
 MAX_PROFILES: Final = 4
-# Profile port names -> custom_mode port keys, and their maximum power
-PROFILE_PORTS: Final = {"C1": "c1", "C2": "c2", "C3": "c3", "C4": "c4", "A": "a"}
-PORT_MAX_POWER: Final = {"C1": 140, "C2": 100, "C3": 100, "C4": 100, "A": 24}
+# Profile port names ("C1" ... "A") -> custom_mode port keys, and their maximum power
+PROFILE_PORTS: Final = {port.profile: port.custom for port in PORTS}
+PORT_MAX_POWER: Final = {port.profile: port.max_power for port in PORTS}
 
 
 def saved_profiles(coordinator: PrimeChargerCoordinator) -> list[dict[str, Any]]:
@@ -42,8 +44,8 @@ def find_profile(coordinator: PrimeChargerCoordinator, name: str) -> dict[str, A
         if str(profile.get("name", "")).strip().lower() == name.strip().lower():
             return profile
     names = ", ".join(str(p.get("name")) for p in profiles) or "none"
-    raise ServiceValidationError(
-        f"No custom profile named '{name}' (profiles: {names})"
+    raise translated(
+        ServiceValidationError, "profile_not_found", name=name, profiles=names
     )
 
 
@@ -60,7 +62,9 @@ def profile_settings(profile: dict[str, Any]) -> custom_mode.CustomSettings:
                 [name for name in custom_mode.PROTOCOLS if item.get(name)]
             )
     if set(limits) != set(custom_mode.PORTS):
-        raise HomeAssistantError(f"Profile '{profile.get('name')}' is incomplete")
+        raise translated(
+            HomeAssistantError, "profile_incomplete", name=profile.get("name")
+        )
     return custom_mode.CustomSettings(
         limits=limits, protocols=protocols, auto_exit=bool(profile.get("auto_exit"))
     )
@@ -110,7 +114,7 @@ def build_profile(
 def check_name(name: str | None) -> str:
     """A non-empty profile name."""
     if not (name := (name or "").strip()):
-        raise ServiceValidationError("The profile name can't be empty")
+        raise translated(ServiceValidationError, "profile_name_empty")
     return name
 
 
@@ -160,13 +164,11 @@ async def async_create_profile(
     name = check_name(name)
     profiles = saved_profiles(coordinator)
     if any(str(p.get("name", "")).strip().lower() == name.lower() for p in profiles):
-        raise ServiceValidationError(f"A custom profile named '{name}' already exists")
+        raise translated(ServiceValidationError, "profile_exists", name=name)
     used = {p.get("number") for p in profiles}
     number = next((n for n in range(1, MAX_PROFILES + 1) if n not in used), None)
     if number is None:
-        raise ServiceValidationError(
-            f"The charger holds at most {MAX_PROFILES} custom profiles; delete one first"
-        )
+        raise translated(ServiceValidationError, "too_many_profiles", max=MAX_PROFILES)
     base = custom_mode.current_settings(coordinator)
     settings = custom_mode.resolve(coordinator, base, limits, auto_exit, protocols)
     body = build_profile(new_profile_template(number), settings, name) | {

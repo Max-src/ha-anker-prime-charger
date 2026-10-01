@@ -10,12 +10,17 @@ The same port has different names in different places:
 - MQTT controls, timers and schedules: "usbc_1" ... "usba"
 - MQTT readings: "usbc_1" ... "usba_1", "usba_2"
 - custom charging mode: "c1" ... "a"
+- custom profiles in the Anker cloud: "C1" ... "C4", "A"
 - port labels in the Anker cloud: "C1" ... "A1", "A2"
+
+Everything else that is specific to a port (maximum power, priority) is here
+too; the other modules derive their tables from PORTS.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Final
 
 from homeassistant.helpers.device_registry import ChildDeviceInfo
@@ -32,6 +37,9 @@ class Port:
     custom: str  # custom charging mode
     outputs: tuple[str, ...]  # MQTT readings, one per physical port
     remarks: tuple[str, ...]  # port label names in the Anker cloud
+    profile: str  # port name in the custom profiles of the Anker cloud
+    max_power: int  # W, custom mode limit (USB-A: both ports together)
+    output_max_power: float  # W, of each physical port (Anker's user guide)
 
     @property
     def is_usb_c(self) -> bool:
@@ -47,13 +55,28 @@ class Port:
 
 
 PORTS: Final = (
-    Port("usbc_1", "USB-C 1", "c1", ("usbc_1",), ("C1",)),
-    Port("usbc_2", "USB-C 2", "c2", ("usbc_2",), ("C2",)),
-    Port("usbc_3", "USB-C 3", "c3", ("usbc_3",), ("C3",)),
-    Port("usbc_4", "USB-C 4", "c4", ("usbc_4",), ("C4",)),
-    Port("usba", "USB-A", "a", ("usba_1", "usba_2"), ("A1", "A2")),
+    Port("usbc_1", "USB-C 1", "c1", ("usbc_1",), ("C1",), "C1", 140, 140),
+    Port("usbc_2", "USB-C 2", "c2", ("usbc_2",), ("C2",), "C2", 100, 100),
+    Port("usbc_3", "USB-C 3", "c3", ("usbc_3",), ("C3",), "C3", 100, 100),
+    Port("usbc_4", "USB-C 4", "c4", ("usbc_4",), ("C4",), "C4", 100, 100),
+    Port("usba", "USB-A", "a", ("usba_1", "usba_2"), ("A1", "A2"), "A", 24, 22.5),
 )
 USB_C_PORTS: Final = tuple(port for port in PORTS if port.is_usb_c)
+USB_A_PORT: Final = next(port for port in PORTS if not port.is_usb_c)
+
+# Priority ports (Connection priority mode): up to two USB-C ports. The command
+# takes a bitmask (bit 0 = USB-C 1 ...); the status reports a flag per port
+# (<key>_priority): 1 normal, 2 priority. Options: "off", "c1", ..., "c1_c2", ...
+PRIORITY_NORMAL: Final = 1
+PRIORITY_ON: Final = 2
+PRIORITY_OPTIONS: Final[dict[str, int]] = {
+    "off": 0,
+    **{port.custom: 1 << idx for idx, port in enumerate(USB_C_PORTS)},
+    **{
+        f"{a.custom}_{b.custom}": (1 << ia) | (1 << ib)
+        for (ia, a), (ib, b) in combinations(enumerate(USB_C_PORTS), 2)
+    },
+}
 
 
 def port_device_info(

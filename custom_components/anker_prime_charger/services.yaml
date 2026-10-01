@@ -1,3 +1,4 @@
+# Profile settings fields: defined once (in save_custom_profile), reused below
 save_custom_profile:
   target:
     entity:
@@ -17,48 +18,37 @@ save_custom_profile:
       default: false
       selector:
         boolean:
-    auto_deactivation:
+    auto_deactivation: &auto_deactivation
       selector:
         boolean:
-    c1_power:
+    c1_power: &c1_power
       selector:
         number:
           min: 0
           max: 140
           unit_of_measurement: W
           mode: box
-    c2_power:
+    c2_power: &usb_c_power
       selector:
         number:
           min: 0
           max: 100
           unit_of_measurement: W
           mode: box
-    c3_power:
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: W
-          mode: box
-    c4_power:
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: W
-          mode: box
-    a_power:
+    c3_power: *usb_c_power
+    c4_power: *usb_c_power
+    a_power: &a_power
       selector:
         select:
           options:
           - '0'
           - '15'
           - '24'
-    c1_protocols:
+    c1_protocols: &protocols
       selector:
         select:
           multiple: true
+          translation_key: protocol
           options:
           - scp
           - ufcs
@@ -66,43 +56,11 @@ save_custom_profile:
           - pps11v
           - pps16v
           - pps20v
+          - huawei
           - xiaomi
-    c2_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
-    c3_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
-    c4_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
+    c2_protocols: *protocols
+    c3_protocols: *protocols
+    c4_protocols: *protocols
 create_custom_profile:
   target:
     entity:
@@ -114,92 +72,32 @@ create_custom_profile:
       example: Travel
       selector:
         text: {}
-    auto_deactivation:
-      selector:
-        boolean:
-    c1_power:
-      selector:
-        number:
-          min: 0
-          max: 140
-          unit_of_measurement: W
-          mode: box
-    c2_power:
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: W
-          mode: box
-    c3_power:
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: W
-          mode: box
-    c4_power:
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: W
-          mode: box
-    a_power:
-      selector:
-        select:
-          options:
-          - '0'
-          - '15'
-          - '24'
-    c1_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
-    c2_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
-    c3_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
-    c4_protocols:
-      selector:
-        select:
-          multiple: true
-          options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - xiaomi
+    auto_deactivation: *auto_deactivation
+    c1_power: *c1_power
+    c2_power: *usb_c_power
+    c3_power: *usb_c_power
+    c4_power: *usb_c_power
+    a_power: *a_power
+    c1_protocols: *protocols
+    c2_protocols: *protocols
+    c3_protocols: *protocols
+    c4_protocols: *protocols
+set_custom_settings:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: select
+  fields:
+    auto_deactivation: *auto_deactivation
+    c1_power: *c1_power
+    c2_power: *usb_c_power
+    c3_power: *usb_c_power
+    c4_power: *usb_c_power
+    a_power: *a_power
+    c1_protocols: *protocols
+    c2_protocols: *protocols
+    c3_protocols: *protocols
+    c4_protocols: *protocols
 delete_custom_profile:
   target:
     entity:
@@ -211,3 +109,33 @@ delete_custom_profile:
       example: test 1
       selector:
         text:
+set_days:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: text
+  fields:
+    days:
+      example:
+      - mon
+      - wed
+      - fri
+      selector:
+        select:
+          multiple: true
+          translation_key: weekday
+          options:
+          - mon
+          - tue
+          - wed
+          - thu
+          - fri
+          - sat
+          - sun
+set_protocols:
+  target:
+    entity:
+      integration: anker_prime_charger
+      domain: text
+  fields:
+    protocols: *protocols

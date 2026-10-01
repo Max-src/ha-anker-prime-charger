@@ -25,15 +25,11 @@ class RefreshButton(PrimeChargerEntity, ButtonEntity):
 
     _attr_translation_key = "refresh"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _needs_key = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
         super().__init__(coordinator, "refresh")
-
-    @property
-    def available(self) -> bool:
-        """Always pressable while the coordinator works."""
-        return self.coordinator.last_update_success
 
     async def async_press(self) -> None:
         """Send a status request and re-read the cloud settings (profiles, themes, ...)."""

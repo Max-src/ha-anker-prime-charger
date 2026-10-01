@@ -90,6 +90,36 @@
       }
     },
     "select": {
+      "clock_display_days_preset": {
+        "name": "Clock display days preset",
+        "state": {
+          "every_day": "Every day",
+          "weekdays": "Weekdays",
+          "weekends": "Weekends",
+          "none": "None",
+          "custom": "Custom (edit the days field)"
+        }
+      },
+      "schedule_start_days_preset": {
+        "name": "Schedule start days preset",
+        "state": {
+          "every_day": "Every day",
+          "weekdays": "Weekdays",
+          "weekends": "Weekends",
+          "none": "None",
+          "custom": "Custom (edit the days field)"
+        }
+      },
+      "schedule_end_days_preset": {
+        "name": "Schedule end days preset",
+        "state": {
+          "every_day": "Every day",
+          "weekdays": "Weekdays",
+          "weekends": "Weekends",
+          "none": "None",
+          "custom": "Custom (edit the days field)"
+        }
+      },
       "usage_mode": {
         "name": "Charging mode",
         "state": {
@@ -149,6 +179,14 @@
           "15": "15 W",
           "24": "24 W"
         }
+      },
+      "custom_protocols_preset": {
+        "name": "Custom protocols preset",
+        "state": {
+          "all": "All allowed at this power",
+          "none": "None",
+          "custom": "Custom (edit the protocols field)"
+        }
       }
     },
     "sensor": {
@@ -160,6 +198,12 @@
       },
       "energy": {
         "name": "Energy"
+      },
+      "a1_energy": {
+        "name": "A1 energy"
+      },
+      "a2_energy": {
+        "name": "A2 energy"
       },
       "power": {
         "name": "Power"
@@ -377,6 +421,52 @@
         }
       }
     },
+    "set_custom_settings": {
+      "name": "Set custom settings",
+      "description": "Change several of the charger's custom charging mode settings at once: port power limits, protocols and automatic deactivation. Unset fields keep their value. Sent in one command, so the charger cuts and renegotiates all ports only once (any custom-mode change does that, also in the app). Switches the charger to the custom mode; nothing is sent if nothing changes.",
+      "fields": {
+        "auto_deactivation": {
+          "name": "Automatic deactivation",
+          "description": "Leave the custom mode when a port set to 0 W is used for charging."
+        },
+        "c1_power": {
+          "name": "USB-C 1 power",
+          "description": "0 W, or 15-140 W."
+        },
+        "c2_power": {
+          "name": "USB-C 2 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c3_power": {
+          "name": "USB-C 3 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c4_power": {
+          "name": "USB-C 4 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "a_power": {
+          "name": "USB-A power",
+          "description": "Both USB-A ports together: 0, 15 or 24 W."
+        },
+        "c1_protocols": {
+          "name": "USB-C 1 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c2_protocols": {
+          "name": "USB-C 2 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c3_protocols": {
+          "name": "USB-C 3 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c4_protocols": {
+          "name": "USB-C 4 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        }
+      }
+    },
     "delete_custom_profile": {
       "name": "Delete custom profile",
       "description": "Delete a custom charging profile from the Anker cloud.",
@@ -386,6 +476,140 @@
           "description": "Name of the profile to delete."
         }
       }
+    },
+    "set_days": {
+      "name": "Set days",
+      "description": "Set the weekdays of a port's scheduled start or end, or of the clock display. Target the matching days entity (e.g. USB-C 1 Schedule end days).",
+      "fields": {
+        "days": {
+          "name": "Days",
+          "description": "The days to set. None selected: no day."
+        }
+      }
+    },
+    "set_protocols": {
+      "name": "Set protocols",
+      "description": "Set the fast-charging protocols a USB-C port allows in the custom charging mode. Target the port's Custom protocols entity. Which protocols are possible depends on the port's custom power (attribute 'allowed'). Re-applies the custom mode, which briefly disconnects the charging devices.",
+      "fields": {
+        "protocols": {
+          "name": "Protocols",
+          "description": "The protocols to allow. None selected: none."
+        }
+      }
+    }
+  },
+  "selector": {
+    "weekday": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    },
+    "protocol": {
+      "options": {
+        "scp": "SCP",
+        "ufcs": "UFCS",
+        "pd12v": "PD 12V",
+        "pps11v": "5-11V PPS",
+        "pps16v": "5-16V PPS",
+        "pps20v": "4.5-21V PPS",
+        "huawei": "Huawei",
+        "xiaomi": "Xiaomi HyperCharge"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Anker login failed: {error}"
+    },
+    "cloud_unreachable": {
+      "message": "Anker cloud not reachable: {error}"
+    },
+    "charger_not_found": {
+      "message": "Charger {serial} not found in the Anker account devices"
+    },
+    "cloud_error": {
+      "message": "Anker cloud error: {error}"
+    },
+    "label_rejected": {
+      "message": "The Anker cloud rejected the {port} label"
+    },
+    "label_not_stored": {
+      "message": "The Anker cloud accepted the {port} label but still reports '{stored}'"
+    },
+    "mqtt_connect_failed": {
+      "message": "Could not connect to the Anker MQTT server"
+    },
+    "mqtt_subscribe_failed": {
+      "message": "MQTT subscription to {topic} failed: {reason}"
+    },
+    "status_request_failed": {
+      "message": "Failed to publish MQTT status request"
+    },
+    "charger_silent": {
+      "message": "No data from the charger since {since}"
+    },
+    "no_mqtt_answer": {
+      "message": "No answer from the charger via MQTT. Is it online, and is this the owner account?"
+    },
+    "command_refused": {
+      "message": "The charger's library refused command {command}"
+    },
+    "not_reported": {
+      "message": "The charger has not reported this yet, try again in a minute"
+    },
+    "usb_a_limit": {
+      "message": "USB-A can be set to {options} W"
+    },
+    "usb_c_limit": {
+      "message": "{port} can be set to 0 W or {min}-{max} W"
+    },
+    "total_too_high": {
+      "message": "The port limits add up to {total} W, more than the charger's {max} W"
+    },
+    "unknown_protocol": {
+      "message": "Unknown protocol {protocols}; possible: {possible}"
+    },
+    "protocol_not_allowed": {
+      "message": "{port} at {watts} W doesn't allow {refused}; allowed: {allowed}"
+    },
+    "profile_not_found": {
+      "message": "No custom profile named '{name}' (profiles: {profiles})"
+    },
+    "profile_incomplete": {
+      "message": "Profile '{name}' is incomplete"
+    },
+    "profile_name_empty": {
+      "message": "The profile name can't be empty"
+    },
+    "profile_exists": {
+      "message": "A custom profile named '{name}' already exists"
+    },
+    "too_many_profiles": {
+      "message": "The charger holds at most {max} custom profiles; delete one first"
+    },
+    "timer_duration": {
+      "message": "The timer takes whole minutes, up to 23 hours 55 minutes"
+    },
+    "unknown_theme": {
+      "message": "Unknown clock theme {theme}"
+    },
+    "target_charging_mode": {
+      "message": "Target the charger's \"Charging mode\" entity with this action"
+    },
+    "target_days": {
+      "message": "Target a \"... days\" entity (schedule start/end days, clock display days) with this action"
+    },
+    "invalid_list": {
+      "message": "Invalid value '{value}': use {example}, all or none (possible: {possible})"
+    },
+    "target_protocols": {
+      "message": "Target a USB-C port's \"Custom protocols\" entity with this action"
     }
   }
 }

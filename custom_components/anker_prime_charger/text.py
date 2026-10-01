@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import custom_mode, schedules
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import WEEKDAYS, to_int, to_weekdays
+from .helpers import WEEKDAYS, to_weekdays, translated
 from .ports import PORTS, USB_C_PORTS, Port
 
 DAYS_PATTERN = r"^\s*(all|none|(mon|tue|wed|thu|fri|sat|sun)(\s*,\s*(mon|tue|wed|thu|fri|sat|sun))*)\s*$"
@@ -31,15 +31,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up text entities."""
     coordinator = entry.runtime_data
-    entities: list[TextEntity] = [ClockDisplayDays(coordinator)]
+    entities: list[TextEntity] = [WeekdaysText(coordinator, None, None)]
     for port in PORTS:
         entities += [
             PortLabel(coordinator, port, output, remark)
             for output, remark in zip(port.outputs, port.remarks, strict=True)
         ]
         entities += [
-            PortScheduleDays(coordinator, port, part)
-            for part in schedules.SCHEDULE_PARTS
+            WeekdaysText(coordinator, port, part) for part in schedules.SCHEDULE_PARTS
         ]
     entities += [PortProtocols(coordinator, port) for port in USB_C_PORTS]
     async_add_entities(entities)
@@ -58,18 +57,37 @@ def parse_list(
         else {n.strip() for n in text.split(",") if n.strip()}
     )
     if not names or names - set(allowed):
-        raise ServiceValidationError(
-            f"Invalid value '{value}': use {example}, all or none "
-            f"(possible: {', '.join(allowed) or 'none'})"
+        raise translated(
+            ServiceValidationError,
+            "invalid_list",
+            value=value,
+            example=example,
+            possible=", ".join(allowed) or "none",
         )
     return [name for name in allowed if name in names]
 
 
 class WeekdaysText(PrimeChargerEntity, TextEntity):
-    """Weekdays, e.g. "mon,tue,wed,thu,fri"; 3-letter English names, "all" or "none"."""
+    """Weekdays, e.g. "mon,tue,wed,thu,fri"; 3-letter English names, "all" or "none".
+
+    Days of a port's scheduled start or end (see schedules.py), or (no port)
+    days on which the clock screen is shown. Also set by the "Set days" action.
+    """
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_pattern = DAYS_PATTERN
+
+    def __init__(
+        self, coordinator: PrimeChargerCoordinator, port: Port | None, part: str | None
+    ) -> None:
+        """Initialize."""
+        super().__init__(
+            coordinator, schedules.weekdays_key(port.key if port else None, part), port
+        )
+        self._part = part
+        self._attr_translation_key = (
+            f"schedule_{part}_days" if port else "clock_display_days"
+        )
 
     @property
     def native_value(self) -> str | None:
@@ -79,39 +97,12 @@ class WeekdaysText(PrimeChargerEntity, TextEntity):
 
     async def async_set_value(self, value: str) -> None:
         """Set the days."""
-        await self._async_set_days(parse_list(value, WEEKDAYS, "e.g. mon,tue,wed"))
+        await self.async_set_days(parse_list(value, WEEKDAYS, "e.g. mon,tue,wed"))
 
-    async def _async_set_days(self, days: list[str]) -> None:
-        raise NotImplementedError
-
-
-class ClockDisplayDays(WeekdaysText):
-    """Days on which the clock screen is shown."""
-
-    _attr_translation_key = "clock_display_days"
-
-    def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
-        """Initialize."""
-        super().__init__(coordinator, "clock_display_weekdays")
-
-    async def _async_set_days(self, days: list[str]) -> None:
-        await schedules.async_set_clock_schedule(self.coordinator, weekdays=days)
-
-
-class PortScheduleDays(WeekdaysText):
-    """Days of a port's scheduled start or end (see schedules.py)."""
-
-    def __init__(
-        self, coordinator: PrimeChargerCoordinator, port: Port, part: str
-    ) -> None:
-        """Initialize."""
-        super().__init__(coordinator, f"{port.key}_{part}_weekdays", port)
-        self._part = part
-        self._attr_translation_key = f"schedule_{part}_days"
-
-    async def _async_set_days(self, days: list[str]) -> None:
-        await schedules.async_set_schedule(
-            self.coordinator, self.port.key, self._part, weekdays=days
+    async def async_set_days(self, days: list[str]) -> None:
+        """Send the days (in any order) to the charger."""
+        await schedules.async_set_days(
+            self.coordinator, self.port.key if self.port else None, self._part, days
         )
 
 
@@ -132,12 +123,7 @@ class PortProtocols(PrimeChargerEntity, TextEntity):
 
     def _allowed(self) -> list[str] | None:
         """Protocols allowed at the port's current custom power (None: unknown)."""
-        watts = to_int(
-            (self.coordinator.data or {}).get(custom_mode.limit_key(self.port.custom))
-        )
-        if watts is None:
-            return None
-        return custom_mode.allowed_protocols(self.coordinator, self.port.custom, watts)
+        return custom_mode.current_allowed_protocols(self.coordinator, self.port.custom)
 
     @property
     def native_value(self) -> str | None:
@@ -163,6 +149,10 @@ class PortProtocols(PrimeChargerEntity, TextEntity):
             else allowed,
             "e.g. scp,ufcs,pps11v",
         )
+        await self.async_set_protocols(names)
+
+    async def async_set_protocols(self, names: list[str]) -> None:
+        """Allow exactly these protocols (also from the "Set protocols" action)."""
         await custom_mode.async_apply(
             self.coordinator, protocols={self.port.custom: names}
         )
@@ -173,6 +163,7 @@ class PortLabel(PrimeChargerEntity, TextEntity):
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_max = 20
+    _needs_key = False
 
     def __init__(
         self, coordinator: PrimeChargerCoordinator, port: Port, output: str, remark: str
@@ -185,10 +176,7 @@ class PortLabel(PrimeChargerEntity, TextEntity):
     @property
     def available(self) -> bool:
         """Available once the labels were read from the Anker cloud."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.cloud.port_labels is not None
-        )
+        return super().available and self.coordinator.cloud.port_labels is not None
 
     @property
     def native_value(self) -> str | None:

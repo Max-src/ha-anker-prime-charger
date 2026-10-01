@@ -91,7 +91,7 @@ class UsbCPowerLimit(PrimeChargerEntity, NumberEntity):
 
 
 class PortTimerDuration(PrimeChargerEntity, NumberEntity):
-    """How long the port stays on once its timer is started (5 minute steps)."""
+    """How long the port stays on once its timer is started (whole minutes)."""
 
     _attr_translation_key = "timer_duration"
     _attr_entity_category = EntityCategory.CONFIG
