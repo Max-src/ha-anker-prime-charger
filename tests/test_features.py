@@ -303,7 +303,7 @@ async def test_port_label_not_stored(
     """A label the cloud accepts but does not store is reported, not shown as set."""
     cloud.ignore_port_labels = True
     eid = entity_id(hass, "text", "port_label_c1")
-    with pytest.raises(HomeAssistantError, match="still reports 'MacBook'"):
+    with pytest.raises(HomeAssistantError, match="still reports MacBook"):
         await call(hass, "text", "set_value", eid, value="Work laptop")
     assert hass.states.get(eid).state == "MacBook"
 
