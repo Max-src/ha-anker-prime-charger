@@ -1,0 +1,48 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+# The vendored Anker library is kept as published upstream
+extend-exclude = ["custom_components/anker_prime_charger/solixapi"]
+
+[tool.ruff.lint]
+select = [
+    "ASYNC", # async pitfalls
+    "B",     # likely bugs
+    "BLE",   # blind except
+    "C4",    # comprehensions
+    "D",     # docstrings
+    "E",     # pycodestyle
+    "F",     # pyflakes
+    "I",     # import order
+    "PIE",   # misc. lints
+    "RET",   # return statements
+    "RUF",   # ruff's own rules
+    "SIM",   # simplifications
+    "SLF",   # private member access
+    "UP",    # modern syntax
+    "W",     # pycodestyle warnings
+]
+ignore = [
+    "D202",   # blank line after a function docstring (the formatter decides)
+    "E501",   # line length (the formatter wraps code; long strings are fine)
+    "RUF012", # Home Assistant's class-level _attr_* lists (HA ignores it too)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+# Same order as Home Assistant: stdlib, third party, Home Assistant, ours
+known-first-party = ["homeassistant", "custom_components"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "SLF001"]
+# Interactive command-line scripts: blocking input() is intended
+"tools/*" = ["D", "BLE001", "SLF001", "ASYNC"]

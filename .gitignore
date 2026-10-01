@@ -1,0 +1,15 @@
+# Local deployment to my Home Assistant
+deploy.ps1
+deploy.bat
+
+# Anker login cache written by the library (contains tokens)
+authcache/
+
+# Results of the investigation scripts in tools/ (account details)
+tools/*_results.json
+
+# Python / test caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

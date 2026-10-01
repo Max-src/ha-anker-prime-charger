@@ -1,0 +1,385 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Anker account",
+        "description": "Log in with the Anker account that OWNS the charger (shared/member accounts cannot use MQTT).",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "device": {
+        "title": "Select charger",
+        "data": {
+          "device_sn": "Charger"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "The Anker login for {email} stopped working. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not reach the Anker cloud.",
+      "no_devices": "No supported charger found in this account. Supported so far: Anker Prime Charger 250W (A2345).",
+      "unknown": "Unexpected error, check the logs."
+    },
+    "abort": {
+      "already_configured": "This charger is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Status request interval",
+          "fast_updates_minutes": "Fast updates duration"
+        },
+        "data_description": {
+          "scan_interval": "How often Home Assistant asks the charger for a full status update over MQTT.",
+          "fast_updates_minutes": "Fast updates (port values every second) stop by themselves after this long."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "connected": {
+        "name": "Connected"
+      },
+      "a1_connected": {
+        "name": "A1 connected"
+      },
+      "a2_connected": {
+        "name": "A2 connected"
+      }
+    },
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "event": {
+      "hidden_animation": {
+        "name": "Hidden animation",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "played": "Played"
+            }
+          }
+        }
+      }
+    },
+    "number": {
+      "display_brightness": {
+        "name": "Display brightness"
+      },
+      "custom_power_limit": {
+        "name": "Custom power limit"
+      },
+      "timer_duration": {
+        "name": "Timer duration"
+      }
+    },
+    "select": {
+      "usage_mode": {
+        "name": "Charging mode",
+        "state": {
+          "ai_power": "AI power",
+          "port_priority": "Connection priority",
+          "dual_laptop": "Dual laptop",
+          "low_power": "Low power"
+        }
+      },
+      "display_timeout_mode": {
+        "name": "Display timeout",
+        "state": {
+          "never": "Never",
+          "30s": "30 seconds",
+          "1min": "1 minute",
+          "5min": "5 minutes",
+          "30min": "30 minutes"
+        }
+      },
+      "knob_mode": {
+        "name": "Knob direction",
+        "state": {
+          "forward": "Forward",
+          "backward": "Backward"
+        }
+      },
+      "clock_mode": {
+        "name": "Clock format",
+        "state": {
+          "12h": "12-hour",
+          "24h": "24-hour"
+        }
+      },
+      "port_priority": {
+        "name": "Priority ports",
+        "state": {
+          "off": "None",
+          "c1": "USB-C 1",
+          "c2": "USB-C 2",
+          "c3": "USB-C 3",
+          "c4": "USB-C 4",
+          "c1_c2": "USB-C 1 + 2",
+          "c1_c3": "USB-C 1 + 3",
+          "c1_c4": "USB-C 1 + 4",
+          "c2_c3": "USB-C 2 + 3",
+          "c2_c4": "USB-C 2 + 4",
+          "c3_c4": "USB-C 3 + 4"
+        }
+      },
+      "clock_theme": {
+        "name": "Clock theme"
+      },
+      "custom_power_limit": {
+        "name": "Custom power limit",
+        "state": {
+          "0": "0 W",
+          "15": "15 W",
+          "24": "24 W"
+        }
+      }
+    },
+    "sensor": {
+      "total_output_power": {
+        "name": "Total output power"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "voltage": {
+        "name": "Voltage"
+      },
+      "current": {
+        "name": "Current"
+      },
+      "a1_power": {
+        "name": "A1 power"
+      },
+      "a2_power": {
+        "name": "A2 power"
+      },
+      "a1_voltage": {
+        "name": "A1 voltage"
+      },
+      "a2_voltage": {
+        "name": "A2 voltage"
+      },
+      "a1_current": {
+        "name": "A1 current"
+      },
+      "a2_current": {
+        "name": "A2 current"
+      },
+      "timer_end": {
+        "name": "Timer end"
+      },
+      "unlocked_animations": {
+        "name": "Unlocked animations"
+      }
+    },
+    "switch": {
+      "clock_switch": {
+        "name": "Clock display"
+      },
+      "time_display": {
+        "name": "Time display"
+      },
+      "holiday_switch": {
+        "name": "Holiday updates"
+      },
+      "auto_exit_switch": {
+        "name": "Automatic deactivation"
+      },
+      "fast_updates": {
+        "name": "Fast updates"
+      },
+      "compatibility_status": {
+        "name": "Maximum compatibility"
+      },
+      "charging_mode_status": {
+        "name": "Custom charging mode"
+      },
+      "charging_device_identity_status": {
+        "name": "Charging device identification"
+      },
+      "timer": {
+        "name": "Timer"
+      },
+      "schedule_start": {
+        "name": "Schedule start"
+      },
+      "schedule_end": {
+        "name": "Schedule end"
+      }
+    },
+    "text": {
+      "clock_display_days": {
+        "name": "Clock display days"
+      },
+      "label": {
+        "name": "Label"
+      },
+      "a1_label": {
+        "name": "A1 label"
+      },
+      "a2_label": {
+        "name": "A2 label"
+      },
+      "custom_protocols": {
+        "name": "Custom protocols"
+      },
+      "schedule_start_days": {
+        "name": "Schedule start days"
+      },
+      "schedule_end_days": {
+        "name": "Schedule end days"
+      }
+    },
+    "time": {
+      "clock_display_start": {
+        "name": "Clock display start"
+      },
+      "clock_display_end": {
+        "name": "Clock display end"
+      },
+      "schedule_start_time": {
+        "name": "Schedule start time"
+      },
+      "schedule_end_time": {
+        "name": "Schedule end time"
+      }
+    }
+  },
+  "services": {
+    "save_custom_profile": {
+      "name": "Save custom profile",
+      "description": "Change a custom charging profile saved in the Anker cloud (the app's custom modes): its name, port powers, protocols and automatic deactivation. Unset fields keep their value. Doesn't apply it to the charger; select it in Charging mode for that.",
+      "fields": {
+        "profile": {
+          "name": "Profile",
+          "description": "Name of the saved custom profile to change."
+        },
+        "new_name": {
+          "name": "New name",
+          "description": "Rename the profile."
+        },
+        "from_charger": {
+          "name": "Start from the charger's settings",
+          "description": "Start from the charger's current custom settings (the custom power limit, protocol and automatic deactivation entities) instead of the profile's own; the fields below change them further."
+        },
+        "auto_deactivation": {
+          "name": "Automatic deactivation",
+          "description": "Leave the custom mode when a port set to 0 W is used for charging."
+        },
+        "c1_power": {
+          "name": "USB-C 1 power",
+          "description": "0 W, or 15-140 W."
+        },
+        "c2_power": {
+          "name": "USB-C 2 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c3_power": {
+          "name": "USB-C 3 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c4_power": {
+          "name": "USB-C 4 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "a_power": {
+          "name": "USB-A power",
+          "description": "Both USB-A ports together: 0, 15 or 24 W."
+        },
+        "c1_protocols": {
+          "name": "USB-C 1 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c2_protocols": {
+          "name": "USB-C 2 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c3_protocols": {
+          "name": "USB-C 3 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c4_protocols": {
+          "name": "USB-C 4 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        }
+      }
+    },
+    "create_custom_profile": {
+      "name": "Create custom profile",
+      "description": "Create a custom charging profile in the Anker cloud (at most 4), from the charger's current custom settings (the custom power limit, protocol and automatic deactivation entities); the fields change them. Doesn't apply it; select it in Charging mode for that.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the new profile."
+        },
+        "auto_deactivation": {
+          "name": "Automatic deactivation",
+          "description": "Leave the custom mode when a port set to 0 W is used for charging."
+        },
+        "c1_power": {
+          "name": "USB-C 1 power",
+          "description": "0 W, or 15-140 W."
+        },
+        "c2_power": {
+          "name": "USB-C 2 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c3_power": {
+          "name": "USB-C 3 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "c4_power": {
+          "name": "USB-C 4 power",
+          "description": "0 W, or 15-100 W."
+        },
+        "a_power": {
+          "name": "USB-A power",
+          "description": "Both USB-A ports together: 0, 15 or 24 W."
+        },
+        "c1_protocols": {
+          "name": "USB-C 1 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c2_protocols": {
+          "name": "USB-C 2 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c3_protocols": {
+          "name": "USB-C 3 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        },
+        "c4_protocols": {
+          "name": "USB-C 4 protocols",
+          "description": "Fast-charging protocols allowed on the port; which ones depends on its power (15-20 W: ufcs; 21-22 W: + pps11v, pd12v; 23-44 W: + scp; 45 W and more: + pps16v, pps20v, xiaomi)."
+        }
+      }
+    },
+    "delete_custom_profile": {
+      "name": "Delete custom profile",
+      "description": "Delete a custom charging profile from the Anker cloud.",
+      "fields": {
+        "profile": {
+          "name": "Profile",
+          "description": "Name of the profile to delete."
+        }
+      }
+    }
+  }
+}
