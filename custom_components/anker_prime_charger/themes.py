@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.exceptions import HomeAssistantError
 
-from .helpers import is_on, to_int
+from .helpers import is_on, on_off, to_int, translated
 from .mqtt_extensions import THEME_KIND_MASK, THEME_KINDS
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
@@ -113,16 +113,14 @@ async def async_set_theme(
     """
     data = coordinator.data or {}
     if theme is None and not (theme := current_theme(coordinator)):
-        raise HomeAssistantError(
-            "The current clock theme is not known yet, try again in a minute"
-        )
+        raise translated(HomeAssistantError, "not_reported")
     if clock_on is None:
         clock_on = bool(is_on(data.get("clock_switch")))
     holiday_on = bool(is_on(data.get("holiday_switch")))
     kind = theme.get("kind", "stock")
     parm_map = {
-        "set_clock_switch": "on" if clock_on else "off",
-        "set_holiday_switch": "on" if holiday_on else "off",
+        "set_clock_switch": on_off(clock_on),
+        "set_holiday_switch": on_off(holiday_on),
         "set_theme_type": kind,
         "set_theme_id": int(theme.get("id") or 0),
         "set_theme_hash": int(str(theme.get("file_hash") or "0"), 16),

@@ -26,21 +26,17 @@ from typing import Any, Final
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .coordinator import PrimeChargerCoordinator
-from .helpers import is_on, to_int
+from .helpers import is_on, on_off, to_int, translated
+from .ports import PORTS as PORT_DEVICES, USB_A_PORT, USB_C_PORTS
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
-USB_C_MAX: Final = {"c1": 140, "c2": 100, "c3": 100, "c4": 100}
+# Ports by their custom-mode name ("c1" ... "a"), from ports.PORTS
+USB_C_MAX: Final = {port.custom: port.max_power for port in USB_C_PORTS}
 USB_C_MIN: Final = 15  # or 0
-USB_A_OPTIONS: Final = (0, 15, 24)
+USB_A_OPTIONS: Final = (0, 15, USB_A_PORT.max_power)
 TOTAL_MAX: Final = 250
-PORTS: Final = (*USB_C_MAX, "a")
-LABELS: Final = {
-    "c1": "USB-C 1",
-    "c2": "USB-C 2",
-    "c3": "USB-C 3",
-    "c4": "USB-C 4",
-    "a": "USB-A",
-}
+PORTS: Final = tuple(port.custom for port in PORT_DEVICES)
+LABELS: Final = {port.custom: port.label for port in PORT_DEVICES}
 # Fast-charging protocols a USB-C port can allow (the library's names and order;
 # the app shows e.g. "SCP/UFCS/5-11V/5-16V"): 5-11V, 5-16V and 4.5-21V are PPS.
 PROTOCOLS: Final = (
@@ -78,10 +74,18 @@ def check_limit(port: str, watts: float) -> None:
     """Refuse values the charger doesn't support."""
     if port == "a":
         if watts not in USB_A_OPTIONS:
-            raise ServiceValidationError("USB-A can be set to 0, 15 or 24 W")
+            raise translated(
+                ServiceValidationError,
+                "usb_a_limit",
+                options=f"{', '.join(map(str, USB_A_OPTIONS[:-1]))} or {USB_A_OPTIONS[-1]}",
+            )
     elif not (watts == 0 or USB_C_MIN <= watts <= USB_C_MAX[port]):
-        raise ServiceValidationError(
-            f"{LABELS[port]} can be set to 0 W or {USB_C_MIN}-{USB_C_MAX[port]} W"
+        raise translated(
+            ServiceValidationError,
+            "usb_c_limit",
+            port=LABELS[port],
+            min=USB_C_MIN,
+            max=USB_C_MAX[port],
         )
 
 
@@ -109,14 +113,22 @@ def allowed_protocols(
     return []
 
 
+def current_allowed_protocols(
+    coordinator: PrimeChargerCoordinator, port: str
+) -> list[str] | None:
+    """Protocols a USB-C port can allow at its current custom power (None: unknown)."""
+    watts = to_int((coordinator.data or {}).get(limit_key(port)))
+    if watts is None:
+        return None
+    return allowed_protocols(coordinator, port, watts)
+
+
 def current_settings(coordinator: PrimeChargerCoordinator) -> CustomSettings:
     """The custom settings the charger reports."""
     data = coordinator.data or {}
     limits = {port: to_int(data.get(limit_key(port))) for port in PORTS}
     if None in limits.values():
-        raise HomeAssistantError(
-            "The charger has not reported its custom settings yet, try again in a minute"
-        )
+        raise translated(HomeAssistantError, "not_reported")
     return CustomSettings(
         limits=limits,
         protocols={port: current_protocols(data, port) for port in USB_C_MAX},
@@ -145,23 +157,30 @@ def resolve(
         auto_exit=base.auto_exit if auto_exit is None else auto_exit,
     )
     if (total := sum(new.limits.values())) > TOTAL_MAX:
-        raise ServiceValidationError(
-            f"The port limits add up to {total} W, more than the charger's {TOTAL_MAX} W"
+        raise translated(
+            ServiceValidationError, "total_too_high", total=total, max=TOTAL_MAX
         )
     for port in USB_C_MAX:
         allowed = allowed_protocols(coordinator, port, new.limits[port])
         if protocols and port in protocols:
             wanted = ordered(protocols[port])
             if unknown := set(protocols[port]) - set(PROTOCOLS):
-                raise ServiceValidationError(
-                    f"Unknown protocol {', '.join(sorted(unknown))}; possible: {', '.join(PROTOCOLS)}"
+                raise translated(
+                    ServiceValidationError,
+                    "unknown_protocol",
+                    protocols=", ".join(sorted(unknown)),
+                    possible=", ".join(PROTOCOLS),
                 )
             if allowed is not None and (
                 refused := [n for n in wanted if n not in allowed]
             ):
-                raise ServiceValidationError(
-                    f"{LABELS[port]} at {new.limits[port]} W doesn't allow "
-                    f"{', '.join(refused)}; allowed: {', '.join(allowed) or 'none'}"
+                raise translated(
+                    ServiceValidationError,
+                    "protocol_not_allowed",
+                    port=LABELS[port],
+                    watts=new.limits[port],
+                    refused=", ".join(refused),
+                    allowed=", ".join(allowed) or "none",
                 )
             new.protocols[port] = wanted
         elif allowed is not None and new.limits[port] != base.limits[port]:
@@ -186,7 +205,7 @@ async def async_apply(
     data = coordinator.data or {}
     parm_map: dict[str, Any] = {
         "set_custom_profile_number": to_int(data.get("custom_profile_number")) or 0,
-        "set_auto_exit_switch": "on" if new.auto_exit else "off",
+        "set_auto_exit_switch": on_off(new.auto_exit),
     }
     parm_map |= {
         f"set_usb_{port}_power_limit": watts for port, watts in new.limits.items()

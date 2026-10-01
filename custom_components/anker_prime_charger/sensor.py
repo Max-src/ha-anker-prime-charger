@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
 from homeassistant.components.sensor import (
     RestoreSensor,
@@ -30,8 +30,11 @@ from homeassistant.util import dt as dt_util
 
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import is_on, to_number
+from .helpers import is_on, summed_power, to_number
 from .ports import PORTS, Port
+
+# Every physical port (MQTT reading names)
+ALL_OUTPUTS: Final = tuple(output for port in PORTS for output in port.outputs)
 
 # Readings of each physical port: "<output>_<key>" in the charger's status
 READINGS: tuple[SensorEntityDescription, ...] = (
@@ -68,11 +71,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     entities: list[SensorEntity] = [
         TotalPowerSensor(coordinator),
-        EnergySensor(
-            coordinator,
-            "total_output_energy",
-            [output for port in PORTS for output in port.outputs],
-        ),
+        EnergySensor(coordinator, "total_output_energy", ALL_OUTPUTS),
         UnlockedAnimations(coordinator),
     ]
     for port in PORTS:
@@ -81,15 +80,20 @@ async def async_setup_entry(
             for output in port.outputs
             for description in READINGS
         ]
-        entities.append(
-            EnergySensor(coordinator, f"{port.key}_energy", port.outputs, port)
-        )
+        entities += [
+            EnergySensor(coordinator, f"{output}_energy", (output,), port)
+            for output in port.outputs
+        ]
         entities.append(PortTimerEnd(coordinator, port))
     async_add_entities(entities)
 
 
 class PortReading(PrimeChargerEntity, SensorEntity):
-    """Power, voltage or current of a physical port."""
+    """Power, voltage or current of a physical port.
+
+    Power has the port's maximum as attribute "max_power" (W): USB-C 1 140,
+    USB-C 2-4 100, each USB-A 22.5 (Anker's user guide).
+    """
 
     def __init__(
         self,
@@ -102,6 +106,8 @@ class PortReading(PrimeChargerEntity, SensorEntity):
         super().__init__(coordinator, f"{output}_{description.key}", port)
         self.entity_description = description
         self._attr_translation_key = f"{port.output_prefix(output)}{description.key}"
+        if description.key == "power":
+            self._attr_extra_state_attributes = {"max_power": port.output_max_power}
 
     @property
     def native_value(self) -> float | None:
@@ -112,6 +118,7 @@ class PortReading(PrimeChargerEntity, SensorEntity):
 class TotalPowerSensor(PrimeChargerEntity, SensorEntity):
     """Sum of the output power of all ports."""
 
+    _needs_key = False
     _attr_translation_key = "total_output_power"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -122,24 +129,19 @@ class TotalPowerSensor(PrimeChargerEntity, SensorEntity):
         """Initialize."""
         super().__init__(coordinator, "total_output_power")
 
-    def _port_powers(self) -> list[float]:
-        data = self.coordinator.data or {}
-        return [
-            power
-            for port in PORTS
-            for output in port.outputs
-            if (power := to_number(data.get(f"{output}_power"))) is not None
-        ]
+    def _power(self) -> float | None:
+        return summed_power(self.coordinator.data or {}, ALL_OUTPUTS)
 
     @property
     def available(self) -> bool:
         """Available once any port power was reported."""
-        return self.coordinator.last_update_success and bool(self._port_powers())
+        return super().available and self._power() is not None
 
     @property
     def native_value(self) -> float | None:
         """Return the summed port power."""
-        return round(sum(self._port_powers()), 2)
+        power = self._power()
+        return None if power is None else round(power, 2)
 
 
 class EnergySensor(PrimeChargerEntity, RestoreSensor):
@@ -151,6 +153,7 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
     stopped isn't counted. The total is kept across restarts.
     """
 
+    _needs_key = False
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -163,10 +166,15 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
         outputs: Iterable[str],
         port: Port | None = None,
     ) -> None:
-        """Initialize: `outputs` are the physical ports whose power is added up."""
+        """Initialize: `outputs` are the physical ports whose power is added up.
+
+        On a port device: one physical port (USB-A: "A1 energy", "A2 energy").
+        """
         super().__init__(coordinator, key, port)
-        self._attr_translation_key = "energy" if port else key
         self._outputs = tuple(outputs)
+        self._attr_translation_key = (
+            f"{port.output_prefix(self._outputs[0])}energy" if port else key
+        )
         self._energy = 0.0
         self._last: tuple[datetime, float] | None = None  # last time and power
 
@@ -179,13 +187,7 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
 
     def _power(self) -> float | None:
         """Summed power of the outputs (W), or nothing if none was reported."""
-        data = self.coordinator.data or {}
-        powers = [
-            power
-            for output in self._outputs
-            if (power := to_number(data.get(f"{output}_power"))) is not None
-        ]
-        return sum(powers) if powers else None
+        return summed_power(self.coordinator.data or {}, self._outputs)
 
     def _sample(self) -> None:
         """Add the energy since the last update, and remember the current power."""
@@ -205,7 +207,7 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
     @property
     def available(self) -> bool:
         """Available once any of the outputs' power was reported."""
-        return self.coordinator.last_update_success and self._power() is not None
+        return super().available and self._power() is not None
 
     @property
     def native_value(self) -> float:
@@ -225,8 +227,12 @@ class PortTimerEnd(PrimeChargerEntity, SensorEntity):
 
     def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
         """Initialize."""
-        super().__init__(coordinator, f"{port.key}_timer_remaining_seconds", port)
-        self._attr_unique_id = f"{coordinator.device_sn}_{port.key}_timer_end"
+        super().__init__(
+            coordinator,
+            f"{port.key}_timer_remaining_seconds",
+            port,
+            unique_key=f"{port.key}_timer_end",
+        )
 
     @property
     def native_value(self) -> datetime | None:
@@ -246,6 +252,7 @@ class PortTimerEnd(PrimeChargerEntity, SensorEntity):
 class UnlockedAnimations(PrimeChargerEntity, SensorEntity):
     """Hidden animations unlocked on this charger (from the Anker cloud)."""
 
+    _needs_key = False
     _attr_translation_key = "unlocked_animations"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -256,10 +263,7 @@ class UnlockedAnimations(PrimeChargerEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Available once the list was read from the Anker cloud."""
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.cloud.easter_eggs is not None
-        )
+        return super().available and self.coordinator.cloud.easter_eggs is not None
 
     def _unlocked(self) -> list[dict[str, Any]]:
         return [

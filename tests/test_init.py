@@ -17,7 +17,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 
 from .conftest import SN, FakeCloud
-from .helpers import entity_id
+from .helpers import entity_id, state
 
 
 async def test_setup_and_unload(
@@ -117,6 +117,19 @@ async def test_stale_data_marks_unavailable_then_recovers(
     await poll()
     assert hass.states.get(power).state == "12.0"
     assert hass.states.get(switch).state == "on"
+
+
+async def test_messages_keep_the_poll_schedule(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+) -> None:
+    """Messages between polls (e.g. fast updates) don't postpone the next status request."""
+    coordinator = setup_entry.runtime_data
+    scheduled = coordinator._unsub_refresh
+    assert scheduled is not None
+    cloud.mqtt.deliver({"usbc_1_power": 5.0})
+    await hass.async_block_till_done()
+    assert state(hass, "sensor", "usbc_1_power") == "5.0"
+    assert coordinator._unsub_refresh is scheduled
 
 
 async def test_mqtt_reconnects_after_disconnect(

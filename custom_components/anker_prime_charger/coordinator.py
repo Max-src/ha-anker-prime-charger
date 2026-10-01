@@ -8,6 +8,12 @@ data for it. Live data and controls go through Anker's cloud MQTT broker:
 - the vendored library decodes the binary messages into a flat dict stored at
   api.devices[sn]["mqtt_data"], and calls our callbacks.
 
+Messages arrive on paho's network thread; they are handed to the event loop
+before the library stores them, so the cache is only touched from the loop.
+Values that arrive between polls are pushed to the entities without moving
+the poll schedule (a message every second during fast updates must not
+postpone the status requests).
+
 Settings that live in the Anker cloud are handled by cloud.CloudSettings,
 refreshed in the background.
 """
@@ -36,7 +42,7 @@ from .const import (
     LOGGER,
     MODEL_NAME,
 )
-from .helpers import to_int
+from .helpers import to_int, translated
 from .mqtt_extensions import EASTER_EGG_STATE, EXTRA_STATE_KEYS
 from .solixapi.api import AnkerSolixApi
 from .solixapi.mqtt_charger import SolixMqttDeviceCharger
@@ -76,6 +82,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             LOGGER,
             config_entry=entry,
             name=f"{DOMAIN}_{device_sn}",
+            # a poll mostly returns what we have (the reply comes as a message)
+            always_update=False,
             update_interval=timedelta(
                 seconds=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
             ),
@@ -118,19 +126,17 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 message_callback=self._mqtt_message
             )
             if not session:
-                raise UpdateFailed("Could not connect to the Anker MQTT server")
+                raise translated(UpdateFailed, "mqtt_connect_failed")
             self.api.mqtt_update_callback(self._mqtt_update)
         if self.mqtt_device is None:
             self.mqtt_device = SolixMqttDeviceCharger(self.api, self.device_sn)
         if not self.mqtt_device.is_subscribed():
             topic = f"{session.get_topic_prefix(deviceDict=self.device)}#"
             if (reason := session.subscribe(topic)) is not None:
-                raise UpdateFailed(f"MQTT subscription to {topic} failed: {reason}")
+                raise translated(
+                    UpdateFailed, "mqtt_subscribe_failed", topic=topic, reason=reason
+                )
         return self.mqtt_device
-
-    async def async_mqtt_device(self) -> SolixMqttDeviceCharger:
-        """Return the connected MQTT device, for the library's command helpers."""
-        return await self._async_ensure_mqtt()
 
     def _mqtt_message(
         self,
@@ -144,16 +150,25 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Handle a decoded MQTT message. Called from the paho network thread.
-
-        The library stores the values it knows. Values decoded thanks to
-        mqtt_extensions.py are dropped by it, so hand those to the event loop.
-        """
-        self.api.mqtt_received(
-            session, topic, message, data, model, device_sn, values, *args, **kwargs
+        """Handle a decoded MQTT message. Called from the paho network thread."""
+        self.hass.loop.call_soon_threadsafe(
+            self._async_mqtt_message,
+            (session, topic, message, data, model, device_sn, values, *args),
+            kwargs,
         )
+
+    @callback
+    def _async_mqtt_message(
+        self, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> None:
+        """Let the library store the values it knows, then add ours.
+
+        Values decoded thanks to mqtt_extensions.py are dropped by the library.
+        """
+        self.api.mqtt_received(*args, **kwargs)
+        device_sn, values = args[5], args[6]
         if device_sn == self.device_sn and values:
-            self.hass.loop.call_soon_threadsafe(self._async_extra_values, values)
+            self._async_extra_values(values)
 
     @callback
     def _async_extra_values(self, values: dict[str, Any]) -> None:
@@ -171,16 +186,31 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if changed:
                 self._async_handle_mqtt_update()
 
+    @callback
     def _mqtt_update(self, sn: str | None = None, *args: Any, **kwargs: Any) -> None:
-        """The library updated the charger's values. Called from the paho thread."""
+        """The library updated the charger's values.
+
+        Only called from api.mqtt_received, which runs in _async_mqtt_message.
+        """
         if sn == self.device_sn:
-            self.hass.loop.call_soon_threadsafe(self._async_handle_mqtt_update)
+            self._async_handle_mqtt_update()
 
     @callback
     def _async_handle_mqtt_update(self) -> None:
+        """A message from the charger: it is reachable, push its values."""
         self.last_message = dt_util.utcnow()
         self._got_data.set()
-        self.async_set_updated_data(self._snapshot())
+        self.last_update_success = True
+        self._async_push()
+
+    @callback
+    def _async_push(self) -> None:
+        """Hand the current values to the entities, keeping the poll schedule.
+
+        (async_set_updated_data would restart the poll interval.)
+        """
+        self.data = self._snapshot()
+        self.async_update_listeners()
 
     def _snapshot(self) -> dict[str, Any]:
         """Copy of the charger's decoded values."""
@@ -210,7 +240,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         mdev = await self._async_ensure_mqtt()
         if await mdev.status_request() is None:
-            raise UpdateFailed("Failed to publish MQTT status request")
+            raise translated(UpdateFailed, "status_request_failed")
         if self._polls % THEME_REQUEST_POLLS == 0:
             await mdev.run_command(cmd=SolixMqttCommands.theme_request)
         self._polls += 1
@@ -223,18 +253,15 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # The charger stopped answering (unplugged, offline). Mark entities
             # unavailable instead of showing frozen values; the next message
             # that arrives makes them available again.
-            raise UpdateFailed(
-                f"No data from the charger since {self.last_message.isoformat()}"
+            raise translated(
+                UpdateFailed, "charger_silent", since=self.last_message.isoformat()
             )
         if not self._got_data.is_set():
             try:
                 async with asyncio.timeout(FIRST_DATA_TIMEOUT):
                     await self._got_data.wait()
             except TimeoutError as err:
-                raise UpdateFailed(
-                    "No answer from the charger via MQTT. Is it online, and is "
-                    "this the owner account?"
-                ) from err
+                raise translated(UpdateFailed, "no_mqtt_answer") from err
         return self._snapshot()
 
     # --- Cloud settings -------------------------------------------------------
@@ -278,8 +305,20 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         resp = await mdev.run_command(
             cmd=cmd, value=value, parm=parm, parm_map=dict(parm_map or {})
         )
+        self._async_apply_reply(resp, cmd, expected)
+
+    async def async_set_custom_profile(self, number: int | str) -> None:
+        """Apply a saved custom profile (the library builds the command from it)."""
+        mdev = await self._async_ensure_mqtt()
+        resp = await mdev.set_custom_usage_profile(number=number)
+        self._async_apply_reply(resp, f"custom profile {number}")
+
+    @callback
+    def _async_apply_reply(
+        self, resp: Any, what: str, expected: dict[str, Any] | None = None
+    ) -> None:
         if not isinstance(resp, dict):
-            raise HomeAssistantError(f"The charger's library refused command {cmd}")
+            raise translated(HomeAssistantError, "command_refused", command=what)
         self.async_apply_state(resp | (expected or {}))
 
     @callback
@@ -287,7 +326,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Apply expected states now so entities don't flip back until the next status."""
         if mqtt_data := self.device.get("mqtt_data"):
             mqtt_data.update({k: v for k, v in updates.items() if k in mqtt_data})
-            self.async_set_updated_data(self._snapshot())
+            self._async_push()
 
     # --- Fast updates ---------------------------------------------------------
 

@@ -19,6 +19,7 @@ from homeassistant.helpers.typing import ConfigType
 from .const import CONF_DEVICE_SN, CONF_SERVER, DOMAIN
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import charger_device_info
+from .helpers import translated
 from .library import create_api
 from .services import async_setup_services
 from .solixapi import errors
@@ -65,15 +66,13 @@ async def async_setup_entry(
         # Lists every device the account owns, including standalone chargers
         await api.get_bind_devices()
     except (errors.AuthorizationError, errors.InvalidCredentialsError) as err:
-        raise ConfigEntryAuthFailed(str(err)) from err
+        raise translated(ConfigEntryAuthFailed, "auth_failed", error=err) from err
     except (ClientError, errors.AnkerSolixError) as err:
-        raise ConfigEntryNotReady(f"Anker cloud not reachable: {err}") from err
+        raise translated(ConfigEntryNotReady, "cloud_unreachable", error=err) from err
 
     device_sn = entry.data[CONF_DEVICE_SN]
     if device_sn not in api.devices:
-        raise ConfigEntryNotReady(
-            f"Charger {device_sn} not found in the Anker account devices"
-        )
+        raise translated(ConfigEntryNotReady, "charger_not_found", serial=device_sn)
 
     _remove_retired_entities(hass, entry)
     coordinator = PrimeChargerCoordinator(hass, entry, api, device_sn)
@@ -86,7 +85,6 @@ async def async_setup_entry(
     coordinator.charger_device_id = charger_device.id
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
 
 
@@ -109,10 +107,3 @@ def _remove_retired_entities(
             for platform, suffix in RETIRED_ENTITIES
         ):
             registry.async_remove(reg_entry.entity_id)
-
-
-async def _async_reload_entry(
-    hass: HomeAssistant, entry: PrimeChargerConfigEntry
-) -> None:
-    """Reload when options change."""
-    await hass.config_entries.async_reload(entry.entry_id)

@@ -8,7 +8,12 @@ from typing import Any
 from aiohttp import ClientError
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+    OptionsFlowWithReload,
+)
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
@@ -65,23 +70,15 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
             # Only a login hint: the login returns the account's real country,
             # which then picks the server, so the user isn't asked for it.
             user_input[CONF_COUNTRY] = (self.hass.config.country or "US").upper()
-            try:
-                self._chargers = await self._async_find_chargers(user_input)
-            except (errors.AuthorizationError, errors.InvalidCredentialsError):
-                errors_["base"] = "invalid_auth"
-            except (ClientError, errors.AnkerSolixError):
-                errors_["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                LOGGER.exception("Unexpected error during Anker login")
-                errors_["base"] = "unknown"
+            chargers, error = await self._async_validate(user_input)
+            if error:
+                errors_["base"] = error
             else:
-                if not self._chargers:
-                    errors_["base"] = "no_devices"
-                else:
-                    self._credentials = user_input
-                    if len(self._chargers) == 1:
-                        return await self._async_create(next(iter(self._chargers)))
-                    return await self.async_step_device()
+                self._chargers = chargers
+                self._credentials = user_input
+                if len(chargers) == 1:
+                    return await self._async_create(next(iter(chargers)))
+                return await self.async_step_device()
 
         return self.async_show_form(
             step_id="user",
@@ -137,20 +134,13 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
         errors_: dict[str, str] = {}
         if user_input is not None:
             data = {**entry.data, CONF_PASSWORD: user_input[CONF_PASSWORD]}
-            try:
-                chargers = await self._async_find_chargers(data)
-            except (errors.AuthorizationError, errors.InvalidCredentialsError):
-                errors_["base"] = "invalid_auth"
-            except (ClientError, errors.AnkerSolixError):
-                errors_["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                LOGGER.exception("Unexpected error during Anker login")
-                errors_["base"] = "unknown"
+            chargers, error = await self._async_validate(data)
+            if not error and entry.data[CONF_DEVICE_SN] not in chargers:
+                error = "no_devices"
+            if error:
+                errors_["base"] = error
             else:
-                if entry.data[CONF_DEVICE_SN] not in chargers:
-                    errors_["base"] = "no_devices"
-                else:
-                    return self.async_update_reload_and_abort(entry, data=data)
+                return self.async_update_reload_and_abort(entry, data=data)
 
         return self.async_show_form(
             step_id="reauth_confirm",
@@ -172,6 +162,21 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
             title=self._chargers[device_sn],
             data={**self._credentials, CONF_DEVICE_SN: device_sn},
         )
+
+    async def _async_validate(
+        self, data: dict[str, Any]
+    ) -> tuple[dict[str, str], str | None]:
+        """Log in and find the chargers: ({serial: name}, form error or None)."""
+        try:
+            chargers = await self._async_find_chargers(data)
+        except (errors.AuthorizationError, errors.InvalidCredentialsError):
+            return {}, "invalid_auth"
+        except (ClientError, errors.AnkerSolixError):
+            return {}, "cannot_connect"
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Unexpected error during Anker login")
+            return {}, "unknown"
+        return chargers, None if chargers else "no_devices"
 
     async def _async_find_chargers(self, data: dict[str, Any]) -> dict[str, str]:
         """Log in and return {serial: name} of the supported chargers the account owns.
@@ -223,8 +228,8 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
         return PrimeChargerOptionsFlow()
 
 
-class PrimeChargerOptionsFlow(OptionsFlow):
-    """Status request interval and fast updates duration."""
+class PrimeChargerOptionsFlow(OptionsFlowWithReload):
+    """Status request interval and fast updates duration (reloads when saved)."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

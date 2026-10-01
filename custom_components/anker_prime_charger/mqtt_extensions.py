@@ -12,6 +12,9 @@ to the library's model map at runtime, so the vendored files stay unchanged.
   number, not two flags as the library assumes (stock 0x02, custom 0x04):
   0, 1, 2 = the built-in "Standard Style" themes 1-3, 3 = a stock image
   theme, 5 = a custom image. The app sends exactly these values.
+- Port timer duration (command 0209, field a3 bytes 01, in seconds): the
+  library rounds it to the app's 5 minute steps, but the charger also takes
+  whole minutes (TIMER_STEP; a 1 minute timer works).
 - Hidden ("easter egg") animations: the charger reports each one it plays in
   message 0305, field a2 = animation type (e.g. 5 after unplugging a port 10
   times within 60 s). There is no command to play one.
@@ -36,6 +39,7 @@ from .solixapi.mqttcmdmap import (
     TYPE,
     VALUE_DEFAULT,
     VALUE_OPTIONS,
+    VALUE_STEP,
     SolixMqttCommands,
 )
 from .solixapi.mqttmap import SOLIXMQTTMAP
@@ -53,6 +57,9 @@ EASTER_EGG_STATE: Final = "easter_egg_type"
 # Theme kind: value of the low 3 bits of the clock flag byte
 THEME_KIND_MASK: Final = 0x07
 THEME_KINDS: Final = {"style_1": 0, "style_2": 1, "style_3": 2, "stock": 3, "custom": 5}
+
+# Port timer duration step (seconds), instead of the library's 300
+TIMER_STEP: Final = 60
 
 
 def _theme_kind_field(field: dict[str, Any], default: int) -> dict[str, Any]:
@@ -97,6 +104,21 @@ def _extend_model_map() -> None:
     ):
         theme_cmds[cmd] = theme_cmds[cmd] | {
             "a2": _theme_kind_field(theme_cmds[cmd]["a2"], default)
+        }
+
+    # Timer duration step; the shared descriptions are copied
+    timer_cmds = model_map["0209"]
+    for cmd in (
+        SolixMqttCommands.usbc_1_port_timer,
+        SolixMqttCommands.usbc_2_port_timer,
+        SolixMqttCommands.usbc_3_port_timer,
+        SolixMqttCommands.usbc_4_port_timer,
+        SolixMqttCommands.usba_port_timer,
+    ):
+        field = timer_cmds[cmd]["a3"]
+        seconds = field[BYTES]["01"] | {VALUE_STEP: TIMER_STEP}
+        timer_cmds[cmd] = timer_cmds[cmd] | {
+            "a3": field | {BYTES: field[BYTES] | {"01": seconds}}
         }
 
 

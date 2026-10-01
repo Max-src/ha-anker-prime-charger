@@ -16,20 +16,30 @@ class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
     """Entity bound to one value the charger reports (its "key").
 
     Entities of a port go on that port's device, the others on the charger's.
-    The unique id is "<serial>_<key>", unless a subclass sets its own.
+    The unique id is "<serial>_<unique_key>" (default: the key).
+
+    Available while the charger is reachable and has reported the key; entities
+    that don't show a reported value set _needs_key = False (and may add their
+    own conditions to `available`).
     """
 
     _attr_has_entity_name = True
+    _needs_key = True
 
     def __init__(
-        self, coordinator: PrimeChargerCoordinator, key: str, port: Port | None = None
+        self,
+        coordinator: PrimeChargerCoordinator,
+        key: str,
+        port: Port | None = None,
+        *,
+        unique_key: str | None = None,
     ) -> None:
         """Initialize."""
         super().__init__(coordinator)
         self.key = key
         self.port = port
         sn = coordinator.device_sn
-        self._attr_unique_id = f"{sn}_{key}"
+        self._attr_unique_id = f"{sn}_{unique_key or key}"
         if port is None:
             self._attr_device_info = charger_device_info(coordinator)
         else:
@@ -44,8 +54,10 @@ class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
 
     @property
     def available(self) -> bool:
-        """Available once the charger has reported this key."""
-        return super().available and self.mqtt_value is not None
+        """Available while the charger is reachable (and has reported the key)."""
+        return super().available and (
+            not self._needs_key or self.mqtt_value is not None
+        )
 
 
 def charger_device_info(coordinator: PrimeChargerCoordinator) -> DeviceInfo:

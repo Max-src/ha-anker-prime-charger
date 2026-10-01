@@ -9,10 +9,11 @@ import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
+    mock_restore_cache,
 )
 
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
@@ -39,9 +40,9 @@ async def test_port_timer(
 
 
 async def test_port_timer_duration(
-    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry, commands: list
 ) -> None:
-    """The duration is in minutes, 5 minute steps, and keeps the timer running."""
+    """The duration is in whole minutes, and keeps the timer running."""
     eid = entity_id(hass, "number", "usbc_1_timer_seconds")
     assert float(hass.states.get(eid).state) == 60
     await call(hass, "number", "set_value", eid, value=90)
@@ -49,8 +50,12 @@ async def test_port_timer_duration(
         "usbc_1_port_timer",
         {"set_port_timer_switch": "on", "set_port_timer_seconds": 5400},
     )
-    with pytest.raises(ServiceValidationError, match="5 minute steps"):
-        await call(hass, "number", "set_value", eid, value=7)
+    await call(hass, "number", "set_value", eid, value=7)
+    assert commands[-1][1]["set_port_timer_seconds"] == 420
+    # sent as is, not rounded to the library's 5 minute steps
+    assert last_command_field(cloud, "a3") == "0401a4010000"  # on, 420 s
+    with pytest.raises(ServiceValidationError):  # over 23:55
+        await call(hass, "number", "set_value", eid, value=1436)
 
 
 async def test_port_timer_end(
@@ -107,6 +112,83 @@ async def test_port_schedule(
             "set_port_time_weekdays": [],
         },
     )
+
+
+async def test_schedule_days_preset(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """The preset shows the reported days, "custom" for other sets, and sets them."""
+    preset = entity_id(hass, "select", "usba_start_weekdays_preset")
+    days = entity_id(hass, "text", "usba_start_weekdays")
+    assert hass.states.get(preset).state == "weekdays"
+    assert state(hass, "select", "usbc_1_end_weekdays_preset") == "none"
+
+    await call(hass, "select", "select_option", preset, option="weekends")
+    assert commands[-1][0] == "usba_start_time"
+    assert commands[-1][1]["set_port_time_weekdays"] == ["sat", "sun"]
+    assert commands[-1][1]["set_port_time_hour"] == 7
+    assert hass.states.get(days).state == "sat,sun"
+
+    await call(hass, "text", "set_value", days, value="mon,wed")
+    assert hass.states.get(preset).state == "custom"
+
+    # picking "custom" keeps the days and shows custom until they change
+    await call(hass, "select", "select_option", preset, option="every_day")
+    sent = len(commands)
+    await call(hass, "select", "select_option", preset, option="custom")
+    assert len(commands) == sent
+    assert hass.states.get(preset).state == "custom"
+    assert hass.states.get(days).state == "mon,tue,wed,thu,fri,sat,sun"
+    await call(hass, "text", "set_value", days, value="sat,sun")
+    assert hass.states.get(preset).state == "weekends"
+    await call(hass, "text", "set_value", days, value="sun")
+    assert hass.states.get(preset).state == "custom"
+
+
+async def test_schedule_days_custom_is_restored(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """Custom picked before a restart stays custom while the days are the same."""
+    mock_restore_cache(
+        hass,
+        [State("select.250w_prime_charger_usb_a_schedule_start_days_preset", "custom")],
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    # the fixture's days are Monday to Friday, which is otherwise "weekdays"
+    assert state(hass, "select", "usba_start_weekdays_preset") == "custom"
+    assert state(hass, "select", "usba_end_weekdays_preset") == "none"
+
+
+async def test_set_days_action(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """The Set days action sends the picked days in weekday order."""
+    days = entity_id(hass, "text", "usbc_2_end_weekdays")
+    await call(
+        hass, "anker_prime_charger", "set_days", days, days=["fri", "mon", "wed"]
+    )
+    assert commands[-1][0] == "usbc_2_end_time"
+    assert commands[-1][1]["set_port_time_weekdays"] == ["mon", "wed", "fri"]
+    assert hass.states.get(days).state == "mon,wed,fri"
+
+    await call(hass, "anker_prime_charger", "set_days", days)
+    assert commands[-1][1]["set_port_time_weekdays"] == []
+
+    clock = entity_id(hass, "text", "clock_display_weekdays")
+    await call(hass, "anker_prime_charger", "set_days", clock, days=["sun"])
+    assert commands[-1][0] == "clock_display_schedule"
+    assert commands[-1][1]["set_clock_display_weekdays"] == ["sun"]
+    assert state(hass, "select", "clock_display_weekdays_preset") == "custom"
+
+    with pytest.raises(ServiceValidationError):
+        await call(
+            hass,
+            "anker_prime_charger",
+            "set_days",
+            entity_id(hass, "text", "port_label_c1"),
+            days=["mon"],
+        )
 
 
 async def test_custom_protocols(
@@ -168,6 +250,63 @@ async def test_custom_protocols_follow_power(
     )
     assert commands[-1][1]["set_usb_c1_power_limit"] == 30
     assert commands[-1][1]["set_usb_c1_protocols"] == ["scp", "ufcs"]
+
+
+async def test_custom_protocols_preset(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """All / none of what the port's power allows; anything else is custom."""
+    c1 = entity_id(hass, "select", "custom_usb_c1_protocols_preset")  # 100 W
+    assert hass.states.get(c1).state == "custom"  # ufcs only
+    assert state(hass, "select", "custom_usb_c2_protocols_preset") == "none"
+    assert state(hass, "select", "custom_usb_c4_protocols_preset") == "all"  # 15 W
+
+    await call(hass, "select", "select_option", c1, option="all")
+    assert commands[-1][1]["set_usb_c1_protocols"] == [
+        "scp",
+        "ufcs",
+        "pd12v",
+        "pps11v",
+        "pps16v",
+        "pps20v",
+        "xiaomi",
+    ]
+    assert hass.states.get(c1).state == "all"
+    await call(hass, "select", "select_option", c1, option="none")
+    assert commands[-1][1]["set_usb_c1_protocols"] == []
+
+    sent = len(commands)
+    await call(hass, "select", "select_option", c1, option="custom")
+    assert len(commands) == sent
+    assert hass.states.get(c1).state == "custom"
+
+
+async def test_set_protocols_action(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """The Set protocols action allows exactly the picked protocols."""
+    eid = entity_id(hass, "text", "custom_usb_c1_protocols")
+    await call(
+        hass, "anker_prime_charger", "set_protocols", eid, protocols=["scp", "ufcs"]
+    )
+    assert commands[-1][1]["set_usb_c1_protocols"] == ["scp", "ufcs"]
+    assert hass.states.get(eid).state == "scp,ufcs"
+
+    await call(hass, "anker_prime_charger", "set_protocols", eid)
+    assert commands[-1][1]["set_usb_c1_protocols"] == []
+
+    with pytest.raises(ServiceValidationError, match="doesn't allow huawei"):
+        await call(
+            hass, "anker_prime_charger", "set_protocols", eid, protocols=["huawei"]
+        )
+    with pytest.raises(ServiceValidationError):
+        await call(
+            hass,
+            "anker_prime_charger",
+            "set_protocols",
+            entity_id(hass, "text", "port_label_c1"),
+            protocols=["ufcs"],
+        )
 
 
 async def test_fast_updates(

@@ -35,6 +35,45 @@ def port(profile: dict[str, Any], name: str) -> dict[str, Any]:
     return next(p for p in profile["power_settings"] if p["name"] == name)
 
 
+async def test_set_custom_settings(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """Several ports' settings change in one command, with the usual checks."""
+    await hass.services.async_call(
+        DOMAIN,
+        "set_custom_settings",
+        {
+            ATTR_ENTITY_ID: entity_id(hass, "select", "usage_mode"),
+            "c2_power": 45,
+            "c3_power": 20,
+            "c2_protocols": ["scp", "ufcs"],
+            "auto_deactivation": True,
+        },
+        blocking=True,
+    )
+    assert len(commands) == 1
+    cmd, parm_map = commands[0]
+    assert cmd == "charger_custom_usage_mode"
+    assert parm_map["set_usb_c2_power_limit"] == 45
+    assert parm_map["set_usb_c3_power_limit"] == 20
+    assert parm_map["set_usb_c1_power_limit"] == 100  # unchanged
+    assert parm_map["set_usb_c2_protocols"] == ["scp", "ufcs"]
+    assert parm_map["set_auto_exit_switch"] == "on"
+
+    with pytest.raises(ServiceValidationError, match="250 W"):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_custom_settings",
+            {
+                ATTR_ENTITY_ID: entity_id(hass, "select", "usage_mode"),
+                "c2_power": 100,
+                "c3_power": 100,
+            },
+            blocking=True,
+        )
+    assert len(commands) == 1
+
+
 async def test_save_profile(
     hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
 ) -> None:

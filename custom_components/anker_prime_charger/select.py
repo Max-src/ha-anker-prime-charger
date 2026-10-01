@@ -1,8 +1,8 @@
 """Selects for the Anker Prime Charger integration.
 
 Charger: charging mode (built-in modes and custom profiles), priority ports,
-display timeout, knob direction, clock format, clock theme.
-Ports: USB-A custom power limit (0, 15 or 24 W).
+display timeout, knob direction, clock format, clock theme, clock display days.
+Ports: USB-A custom power limit (0, 15 or 24 W), schedule start and end days.
 """
 
 from __future__ import annotations
@@ -12,19 +12,31 @@ from typing import Any, Final
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
-from . import custom_mode, themes
+from . import custom_mode, schedules, themes
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import to_int
-from .ports import PORTS, Port
+from .helpers import to_int, to_weekdays, translated
+from .ports import (
+    PORTS,
+    PRIORITY_NORMAL,
+    PRIORITY_ON,
+    PRIORITY_OPTIONS,
+    USB_A_PORT,
+    USB_C_PORTS,
+    Port,
+)
+from .schedules import DAY_PRESETS
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
 # usage_mode value of the custom charging mode
 CUSTOM_USAGE_MODE: Final = 5
+# Preset selects: any value that isn't a preset
+CUSTOM: Final = "custom"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,23 +95,6 @@ OPTION_SELECTS: Final[tuple[OptionSelectDescription, ...]] = (
     ),
 )
 
-# Priority ports: the command takes a bitmask of USB-C ports (bit 0 = C1 ...),
-# at most two ports. The status reports a flag per port: 1 normal, 2 priority.
-PRIORITY_PORTS: Final = ("usbc_1", "usbc_2", "usbc_3", "usbc_4")
-PRIORITY_OPTIONS: Final[dict[str, int]] = {
-    "off": 0,
-    "c1": 1,
-    "c2": 2,
-    "c3": 4,
-    "c4": 8,
-    "c1_c2": 3,
-    "c1_c3": 5,
-    "c1_c4": 9,
-    "c2_c3": 6,
-    "c2_c4": 10,
-    "c3_c4": 12,
-}
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -108,16 +103,22 @@ async def async_setup_entry(
 ) -> None:
     """Set up selects."""
     coordinator = entry.runtime_data
-    usb_a = next(port for port in PORTS if not port.is_usb_c)
     entities: list[SelectEntity] = [
         UsageModeSelect(coordinator, USAGE_MODE),
         PortPrioritySelect(coordinator),
         ClockThemeSelect(coordinator),
-        UsbAPowerLimit(coordinator, usb_a),
+        UsbAPowerLimit(coordinator, USB_A_PORT),
+        WeekdaysPresetSelect(coordinator, None, None),
     ]
     entities += [
         OptionSelect(coordinator, description) for description in OPTION_SELECTS
     ]
+    entities += [
+        WeekdaysPresetSelect(coordinator, port, part)
+        for port in PORTS
+        for part in schedules.SCHEDULE_PARTS
+    ]
+    entities += [ProtocolsPresetSelect(coordinator, port) for port in USB_C_PORTS]
     async_add_entities(entities)
 
 
@@ -199,13 +200,7 @@ class UsageModeSelect(OptionSelect):
         if not (profile := self._profiles().get(option)):
             await super().async_select_option(option)
             return
-        mdev = await self.coordinator.async_mqtt_device()
-        resp = await mdev.set_custom_usage_profile(number=profile.get("number"))
-        if not isinstance(resp, dict):
-            raise HomeAssistantError(
-                f"The charger's library refused custom profile {option}"
-            )
-        self.coordinator.async_apply_state(resp)
+        await self.coordinator.async_set_custom_profile(profile.get("number"))
 
 
 class PortPrioritySelect(PrimeChargerEntity, SelectEntity):
@@ -213,6 +208,7 @@ class PortPrioritySelect(PrimeChargerEntity, SelectEntity):
 
     _attr_translation_key = "port_priority"
     _attr_options = list(PRIORITY_OPTIONS)
+    _needs_key = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
@@ -220,15 +216,15 @@ class PortPrioritySelect(PrimeChargerEntity, SelectEntity):
 
     def _mask(self) -> int | None:
         data = self.coordinator.data or {}
-        flags = [to_int(data.get(f"{port}_priority")) for port in PRIORITY_PORTS]
+        flags = [to_int(data.get(f"{port.key}_priority")) for port in USB_C_PORTS]
         if None in flags:
             return None
-        return sum(1 << idx for idx, flag in enumerate(flags) if flag == 2)
+        return sum(1 << idx for idx, flag in enumerate(flags) if flag == PRIORITY_ON)
 
     @property
     def available(self) -> bool:
         """Available once all USB-C priority flags were reported."""
-        return self.coordinator.last_update_success and self._mask() is not None
+        return super().available and self._mask() is not None
 
     @property
     def current_option(self) -> str | None:
@@ -246,14 +242,20 @@ class PortPrioritySelect(PrimeChargerEntity, SelectEntity):
             option,
             "set_port_priority",
             expected={
-                f"{port}_priority": 2 if mask & (1 << idx) else 1
-                for idx, port in enumerate(PRIORITY_PORTS)
+                f"{port.key}_priority": PRIORITY_ON
+                if mask & (1 << idx)
+                else PRIORITY_NORMAL
+                for idx, port in enumerate(USB_C_PORTS)
             },
         )
 
 
 class ClockThemeSelect(PrimeChargerEntity, SelectEntity):
-    """Clock theme: Standard Styles, Anker's stock themes, your custom images."""
+    """Clock theme: Standard Styles, Anker's stock themes, your custom images.
+
+    The theme list is built once per update (and cloud refresh), not for each
+    of the options, the current theme and the picture.
+    """
 
     _attr_translation_key = "clock_theme"
     _attr_entity_category = EntityCategory.CONFIG
@@ -261,48 +263,43 @@ class ClockThemeSelect(PrimeChargerEntity, SelectEntity):
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
         super().__init__(coordinator, "theme_id")
+        self._by_name: dict[str, dict[str, Any]] = {}
+        self._update_themes()
 
-    def _by_name(self) -> dict[str, dict[str, Any]]:
-        return {
+    def _update_themes(self) -> None:
+        by_name = {
             theme["theme_name"]: theme
             for theme in themes.all_themes(self.coordinator).values()
             if theme.get("theme_name")
         }
-
-    @property
-    def options(self) -> list[str]:
-        """Standard Styles, stock themes (by category), then custom images."""
-        by_name = self._by_name()
-        return sorted(
+        self._by_name = by_name
+        # Standard Styles, stock themes (by category), then custom images
+        self._attr_options = sorted(
             by_name,
             key=lambda name: (
                 themes.CATEGORY_ORDER.get(by_name[name].get("category_name"), 1),
                 name.lower(),
             ),
         )
-
-    @property
-    def current_option(self) -> str | None:
-        """Return the active theme."""
-        return themes.current_theme(self.coordinator).get("theme_name")
-
-    @property
-    def entity_picture(self) -> str | None:
-        """Preview of a stock theme.
-
-        Custom image links from the Anker cloud expire after a few minutes, and
-        Standard Styles only have app-internal paths, so neither is used.
-        """
         theme = themes.current_theme(self.coordinator)
+        self._attr_current_option = theme.get("theme_name")
+        # Preview of a stock theme. Custom image links from the Anker cloud
+        # expire after a few minutes, and Standard Styles only have app-internal
+        # paths, so neither is used.
         url = theme.get("image_url") or ""
-        if theme.get("kind") != "stock" or not url.startswith("https://"):
-            return None
-        return url
+        self._attr_entity_picture = (
+            url if theme.get("kind") == "stock" and url.startswith("https://") else None
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._update_themes()
+        super()._handle_coordinator_update()
 
     async def async_select_option(self, option: str) -> None:
         """Show the theme."""
-        if not (theme := self._by_name().get(option)):
-            raise HomeAssistantError(f"Unknown clock theme {option}")
+        if not (theme := self._by_name.get(option)):
+            raise translated(HomeAssistantError, "unknown_theme", theme=option)
         await themes.async_set_theme(self.coordinator, theme=theme)
 
 
@@ -331,4 +328,134 @@ class UsbAPowerLimit(PrimeChargerEntity, SelectEntity):
         """Apply the custom settings with the USB-A limit changed."""
         await custom_mode.async_apply(
             self.coordinator, limits={self.port.custom: int(option)}
+        )
+
+
+class PresetSelect(PrimeChargerEntity, SelectEntity, RestoreEntity):
+    """Presets for a list value that a text entity edits (days, protocols).
+
+    Shows "custom" for any other value. Picking "custom" keeps the value and
+    shows "custom" until it changes (also after a restart), so it can then be
+    edited in the text entity.
+    """
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self, coordinator: PrimeChargerCoordinator, key: str, port: Port | None
+    ) -> None:
+        """Initialize (key: the value's status key)."""
+        super().__init__(coordinator, key, port, unique_key=f"{key}_preset")
+        # the value when "custom" was picked; shown as custom while unchanged
+        self._custom: tuple[str, ...] | None = None
+
+    def _value(self) -> tuple[str, ...] | None:
+        """The current value, or None if not reported."""
+        raise NotImplementedError
+
+    def _presets(self) -> dict[str, tuple[str, ...] | None]:
+        """Value of each preset (None: not known now), in matching order."""
+        raise NotImplementedError
+
+    async def _async_set(self, values: list[str]) -> None:
+        raise NotImplementedError
+
+    async def async_added_to_hass(self) -> None:
+        """Keep "custom" if it was picked before the restart."""
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_state()) and last.state == CUSTOM:
+            self._custom = self._value()
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the preset matching the value, else "custom"."""
+        if (value := self._value()) is None:
+            return None
+        if value == self._custom:
+            return CUSTOM
+        return next(
+            (name for name, preset in self._presets().items() if value == preset),
+            CUSTOM,
+        )
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        if self._custom != self._value():
+            self._custom = None
+        super()._handle_coordinator_update()
+
+    async def async_select_option(self, option: str) -> None:
+        """Send the preset's value to the charger ("custom": keep it)."""
+        if option == CUSTOM:
+            self._custom = self._value()
+            self.async_write_ha_state()
+            return
+        self._custom = None
+        if (preset := self._presets()[option]) is None:
+            raise translated(HomeAssistantError, "not_reported")
+        await self._async_set(list(preset))
+
+
+class WeekdaysPresetSelect(PresetSelect):
+    """Common sets of weekdays for a days text entity (text.WeekdaysText)."""
+
+    _attr_options = [*DAY_PRESETS, CUSTOM]
+
+    def __init__(
+        self, coordinator: PrimeChargerCoordinator, port: Port | None, part: str | None
+    ) -> None:
+        """Initialize."""
+        self._port_key = port.key if port else None
+        self._part = part
+        super().__init__(
+            coordinator, schedules.weekdays_key(self._port_key, part), port
+        )
+        self._attr_translation_key = (
+            f"schedule_{part}_days_preset" if port else "clock_display_days_preset"
+        )
+
+    def _value(self) -> tuple[str, ...] | None:
+        days = to_weekdays(self.mqtt_value)
+        return None if days is None else tuple(days)
+
+    def _presets(self) -> dict[str, tuple[str, ...] | None]:
+        return dict(DAY_PRESETS)
+
+    async def _async_set(self, values: list[str]) -> None:
+        await schedules.async_set_days(
+            self.coordinator, self._port_key, self._part, values
+        )
+
+
+class ProtocolsPresetSelect(PresetSelect):
+    """All or none of the protocols a USB-C port allows at its custom power.
+
+    For a text.PortProtocols entity. Changing it re-applies the custom mode
+    (see custom_mode.py).
+    """
+
+    _attr_translation_key = "custom_protocols_preset"
+    _attr_options = ["all", "none", CUSTOM]
+
+    def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
+        """Initialize."""
+        super().__init__(coordinator, custom_mode.protocols_key(port.custom), port)
+
+    def _value(self) -> tuple[str, ...] | None:
+        if self.mqtt_value is None:
+            return None
+        return tuple(
+            custom_mode.current_protocols(self.coordinator.data or {}, self.port.custom)
+        )
+
+    def _presets(self) -> dict[str, tuple[str, ...] | None]:
+        allowed = custom_mode.current_allowed_protocols(
+            self.coordinator, self.port.custom
+        )
+        # "none" first: at a power that allows nothing, both are the same
+        return {"none": (), "all": None if allowed is None else tuple(allowed)}
+
+    async def _async_set(self, values: list[str]) -> None:
+        await custom_mode.async_apply(
+            self.coordinator, protocols={self.port.custom: values}
         )

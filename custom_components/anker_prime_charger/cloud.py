@@ -24,6 +24,7 @@ from homeassistant.util import dt as dt_util
 
 from . import library, themes
 from .const import LOGGER, MODEL
+from .helpers import translated
 from .solixapi.api import AnkerSolixApi
 from .solixapi.errors import AnkerSolixError
 
@@ -160,7 +161,7 @@ class CloudSettings:
             )
             await self.api.get_charger_device_setting(deviceSn=self.device_sn)
         except CLOUD_ERRORS as err:
-            raise HomeAssistantError(f"Anker cloud error: {err}") from err
+            raise translated(HomeAssistantError, "cloud_error", error=err) from err
 
     async def async_set_port_label(self, port_name: str, label: str) -> None:
         """Store a port label ("C1" ... "A2"), then check it was stored."""
@@ -169,9 +170,9 @@ class CloudSettings:
                 deviceSn=self.device_sn, portName=port_name, remark=label
             )
         except CLOUD_ERRORS as err:
-            raise HomeAssistantError(f"Anker cloud error: {err}") from err
+            raise translated(HomeAssistantError, "cloud_error", error=err) from err
         if resp is False:
-            raise HomeAssistantError(f"The Anker cloud rejected the {port_name} label")
+            raise translated(HomeAssistantError, "label_rejected", port=port_name)
         stored = next(
             (
                 item.get("remark") or ""
@@ -181,8 +182,8 @@ class CloudSettings:
             "",
         )
         if stored != label:
-            raise HomeAssistantError(
-                f"The Anker cloud accepted the {port_name} label but still reports {stored!r}"
+            raise translated(
+                HomeAssistantError, "label_not_stored", port=port_name, stored=stored
             )
 
     async def async_profile_request(self, endpoint: str, body: dict[str, Any]) -> None:
@@ -191,4 +192,4 @@ class CloudSettings:
             await library.async_request(self.api, endpoint, body)
             await self.api.get_charger_custom_mode_list(deviceSn=self.device_sn)
         except CLOUD_ERRORS as err:
-            raise HomeAssistantError(f"Anker cloud error: {err}") from err
+            raise translated(HomeAssistantError, "cloud_error", error=err) from err

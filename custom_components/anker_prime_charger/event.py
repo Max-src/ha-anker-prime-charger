@@ -30,15 +30,11 @@ class HiddenAnimationEvent(PrimeChargerEntity, EventEntity):
 
     _attr_translation_key = "hidden_animation"
     _attr_event_types = [EVENT_PLAYED]
+    _needs_key = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
         super().__init__(coordinator, "hidden_animation")
-
-    @property
-    def available(self) -> bool:
-        """Available while the charger is reachable."""
-        return self.coordinator.last_update_success
 
     async def async_added_to_hass(self) -> None:
         """Listen for animations."""

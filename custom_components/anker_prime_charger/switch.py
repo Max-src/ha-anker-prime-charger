@@ -18,7 +18,7 @@ from . import custom_mode, schedules, themes
 from .const import TEST_FEATURES
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import is_on
+from .helpers import is_on, on_off
 from .mqtt_extensions import TIME_DISPLAY_COMMAND, TIME_DISPLAY_STATE
 from .ports import PORTS, Port
 from .solixapi.mqttcmdmap import SolixMqttCommands
@@ -79,7 +79,7 @@ class PortSwitch(ReportedSwitch):
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
-            f"{self.port.key}_port_switch", "on" if on else "off", "set_port_switch"
+            f"{self.port.key}_port_switch", on_off(on), "set_port_switch"
         )
 
 
@@ -142,7 +142,7 @@ class TimeDisplaySwitch(ReportedSwitch):
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
-            TIME_DISPLAY_COMMAND, "on" if on else "off", "set_time_display"
+            TIME_DISPLAY_COMMAND, on_off(on), "set_time_display"
         )
 
 
@@ -159,7 +159,7 @@ class HolidaySwitch(ReportedSwitch):
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
             SolixMqttCommands.clock_holiday_switch,
-            "on" if on else "off",
+            on_off(on),
             "set_holiday_switch",
         )
 
@@ -203,15 +203,11 @@ class FastUpdatesSwitch(PrimeChargerEntity, SwitchEntity):
     """
 
     _attr_translation_key = "fast_updates"
+    _needs_key = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
         super().__init__(coordinator, "fast_updates")
-
-    @property
-    def available(self) -> bool:
-        """Available while the charger is reachable."""
-        return self.coordinator.last_update_success
 
     @property
     def is_on(self) -> bool:
