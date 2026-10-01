@@ -540,7 +540,7 @@
       "message": "The Anker cloud rejected the {port} label"
     },
     "label_not_stored": {
-      "message": "The Anker cloud accepted the {port} label but still reports '{stored}'"
+      "message": "The Anker cloud accepted the {port} label but still reports {stored}"
     },
     "mqtt_connect_failed": {
       "message": "Could not connect to the Anker MQTT server"
@@ -579,16 +579,16 @@
       "message": "{port} at {watts} W doesn't allow {refused}; allowed: {allowed}"
     },
     "profile_not_found": {
-      "message": "No custom profile named '{name}' (profiles: {profiles})"
+      "message": "No custom profile named {name} (profiles: {profiles})"
     },
     "profile_incomplete": {
-      "message": "Profile '{name}' is incomplete"
+      "message": "Profile {name} is incomplete"
     },
     "profile_name_empty": {
       "message": "The profile name can't be empty"
     },
     "profile_exists": {
-      "message": "A custom profile named '{name}' already exists"
+      "message": "A custom profile named {name} already exists"
     },
     "too_many_profiles": {
       "message": "The charger holds at most {max} custom profiles; delete one first"
@@ -606,7 +606,7 @@
       "message": "Target a \"... days\" entity (schedule start/end days, clock display days) with this action"
     },
     "invalid_list": {
-      "message": "Invalid value '{value}': use {example}, all or none (possible: {possible})"
+      "message": "Invalid value {value}: use {example}, all or none (possible: {possible})"
     },
     "target_protocols": {
       "message": "Target a USB-C port's \"Custom protocols\" entity with this action"

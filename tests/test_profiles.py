@@ -209,7 +209,7 @@ async def test_delete_profile(
     await call_profile_action(hass, "delete_custom_profile", profile="Desk")
     assert requests(cloud, "delete_charging_mode") == [{"id": 24581}]
     assert setup_entry.runtime_data.device["custom_modes"] == {}
-    with pytest.raises(ServiceValidationError, match="No custom profile named 'Desk'"):
+    with pytest.raises(ServiceValidationError, match="No custom profile named Desk"):
         await call_profile_action(hass, "delete_custom_profile", profile="Desk")
 
 

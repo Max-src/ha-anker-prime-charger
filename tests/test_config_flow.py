@@ -187,6 +187,11 @@ async def test_reauth(
     assert entry.data[CONF_DEVICE_SN] == SN
     assert entry.data[CONF_EMAIL] == EMAIL
 
+    # Success reloads the entry in the background; let it finish, then unload
+    # so the coordinator's refresh timer doesn't linger past the test.
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
 
 async def test_reauth_charger_missing(
     hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
