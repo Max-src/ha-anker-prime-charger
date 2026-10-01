@@ -64,6 +64,7 @@ entities are enabled.
 |---|---|
 | *(the port itself)* | The port on or off |
 | Power, voltage, current | Per physical port (USB-A: *A1 …* and *A2 …*) |
+| Energy | Energy delivered (kWh), for the Energy dashboard (USB-A: both ports) |
 | Connected | On while a device is connected |
 | Label | The port's name in the Anker app (USB-A: *A1 label*, *A2 label*) |
 | Custom power limit | The port's maximum power in the custom charging mode: USB-C 0 W or 15-140 W (C1) / 15-100 W (C2-C4); USB-A 0, 15 or 24 W |
@@ -76,6 +77,7 @@ entities are enabled.
 | Entity | Notes |
 |---|---|
 | Total output power | Sum of all ports |
+| Total output energy | Energy delivered by all ports (kWh), for the Energy dashboard |
 | Charging mode | AI power / Connection priority / Dual laptop / Low power, and `Custom: <name>` for each custom profile (when *Custom charging mode* is on) |
 | Priority ports | USB-C ports that get power first in Connection priority mode (up to two) |
 | Automatic deactivation | Custom mode: when a port set to 0 W is used, go back to the previous mode |

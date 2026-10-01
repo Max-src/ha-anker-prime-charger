@@ -155,6 +155,12 @@
       "total_output_power": {
         "name": "Total output power"
       },
+      "total_output_energy": {
+        "name": "Total output energy"
+      },
+      "energy": {
+        "name": "Energy"
+      },
       "power": {
         "name": "Power"
       },
