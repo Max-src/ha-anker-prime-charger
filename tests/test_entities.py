@@ -82,6 +82,26 @@ async def test_energy(
     )
 
 
+async def test_energy_ignores_a_clock_set_back(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    cloud: FakeCloud,
+    setup_entry: MockConfigEntry,
+) -> None:
+    """Energy never decreases (Home Assistant would take it for a meter reset)."""
+    cloud.mqtt.deliver({"usbc_1_power": 60.0})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=1))
+    cloud.mqtt.deliver({"usbc_1_power": 61.0})
+    await hass.async_block_till_done()
+    before = float(state(hass, "sensor", "usbc_1_energy"))
+    assert before > 0
+    freezer.tick(timedelta(minutes=-10))
+    cloud.mqtt.deliver({"usbc_1_power": 62.0})
+    await hass.async_block_till_done()
+    assert float(state(hass, "sensor", "usbc_1_energy")) == before
+
+
 async def test_energy_is_restored(
     hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
 ) -> None:

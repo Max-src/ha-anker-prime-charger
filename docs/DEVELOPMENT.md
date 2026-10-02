@@ -18,9 +18,10 @@
 | `custom_mode.py` | Custom charging mode settings: limits, protocols, checks, the `0206` command |
 | `profiles.py` | Custom profiles in the cloud: save, create, delete |
 | `schedules.py` | Port timers and schedules, clock display schedule, days presets; schedules are addressed as `(port, part)`, port `None` = clock display |
-| `services.py` | The profile actions, Set custom settings, Set days and Set protocols |
+| `services.py` | The actions (profiles, Set custom settings, Set days, Set protocols); they target devices: the charger or a port |
 | `helpers.py` | Value conversions (`to_number`, `to_int`, `is_on`, weekdays), `on_off`, `summed_power`, `translated` (errors with their message in `en.json` "exceptions") |
 | `entity.py` | Base entity: on the charger's device or a port's child device, unique id `<serial>_<unique_key or key>`; available once the key is reported (`_needs_key = False` for entities not bound to one value) |
+| `presets.py` | Preset selects (days, protocols): common values for a list a text entity edits |
 | `binary_sensor.py` … `time.py` | One file per Home Assistant platform |
 | `solixapi/` | The vendored library, unchanged |
 
@@ -127,7 +128,13 @@ app, compare with [PROTOCOL.md](PROTOCOL.md), and only expose what is verified.
 `\\<ha>\config\custom_components\anker_prime_charger` over SMB (Samba share add-on), keeping the
 library's login cache there. Restart Home Assistant afterwards. Both files are git-ignored.
 
-## Publishing
+## Releasing
 
-Before the first release on GitHub, fill in the repository links:
-`manifest.json` (`documentation`, `issue_tracker`, `codeowners`).
+1. Run the tests and `ruff check` / `ruff format --check` (CI runs them too, with hassfest and
+   the HACS check).
+2. Bump `version` in `manifest.json` ([semantic versioning](https://semver.org/): a new feature
+   bumps the minor version, a fix the patch).
+3. Commit, then tag the commit `v<version>` (e.g. `v0.16.0`) and push the tag.
+4. Create a GitHub release from the tag, with the changes in its notes. HACS offers users the
+   new release.
+5. If `hacs.json`'s minimum Home Assistant version changed, say so in the notes.

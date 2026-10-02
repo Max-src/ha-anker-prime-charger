@@ -223,7 +223,7 @@ Apply several settings at once (this switches the charger to custom mode):
 ```yaml
 action: anker_prime_charger.set_custom_settings
 target:
-  entity_id: select.250w_prime_charger_charging_mode
+  device_id: <the charger's device id>
 data:
   c1_power: 100
   c2_power: 45
@@ -236,7 +236,7 @@ Create a profile from the charger's current settings:
 ```yaml
 action: anker_prime_charger.create_custom_profile
 target:
-  entity_id: select.250w_prime_charger_charging_mode
+  device_id: <the charger's device id>
 data:
   name: Desk
 ```
@@ -247,7 +247,7 @@ the current charger settings instead of the saved profile:
 ```yaml
 action: anker_prime_charger.save_custom_profile
 target:
-  entity_id: select.250w_prime_charger_charging_mode
+  device_id: <the charger's device id>
 data:
   profile: Desk
   c1_power: 65
@@ -259,7 +259,7 @@ Delete a profile:
 ```yaml
 action: anker_prime_charger.delete_custom_profile
 target:
-  entity_id: select.250w_prime_charger_charging_mode
+  device_id: <the charger's device id>
 data:
   profile: Desk
 ```
@@ -269,8 +269,9 @@ Choose schedule days (an empty list selects none):
 ```yaml
 action: anker_prime_charger.set_days
 target:
-  entity_id: text.250w_prime_charger_usb_c_1_schedule_end_days
+  device_id: <the USB-C 1 port's device id>
 data:
+  schedule: end
   days: [mon, wed, fri]
 ```
 
@@ -279,7 +280,7 @@ Choose optional fast-charging protocols (an empty list disables them):
 ```yaml
 action: anker_prime_charger.set_protocols
 target:
-  entity_id: text.250w_prime_charger_usb_c_1_custom_protocols
+  device_id: <the USB-C 1 port's device id>
 data:
   protocols: [scp, ufcs, pps16v]
 ```

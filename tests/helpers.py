@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from custom_components.anker_prime_charger.const import DOMAIN
-from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import SN, FakeCloud
 
@@ -17,6 +17,27 @@ def entity_id(hass: HomeAssistant, platform: str, key: str) -> str:
     eid = er.async_get(hass).async_get_entity_id(platform, DOMAIN, f"{SN}_{key}")
     assert eid, f"no {platform} entity for {key}"
     return eid
+
+
+def device_id(hass: HomeAssistant, port: str | None = None) -> str:
+    """Device id of the charger, or of one of its ports ("usbc_1" ... "usba")."""
+    ident = SN if port is None else f"{SN}_{port}"
+    entry_id = hass.config_entries.async_entries(DOMAIN)[0].entry_id
+    devices = dr.async_get(hass)
+    device = (
+        devices.async_get_device_by_identifier((DOMAIN, ident), entry_id)
+        if port is None
+        else devices.async_get_child_device_by_identifier((DOMAIN, ident), entry_id)
+    )
+    assert device, f"no device {ident}"
+    return device.id
+
+
+async def act(hass: HomeAssistant, service: str, device: str, **data: Any) -> None:
+    """Call one of the integration's actions on a device and wait for it."""
+    await hass.services.async_call(
+        DOMAIN, service, {ATTR_DEVICE_ID: device, **data}, blocking=True
+    )
 
 
 def state(hass: HomeAssistant, platform: str, key: str) -> str:

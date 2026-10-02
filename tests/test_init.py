@@ -132,6 +132,22 @@ async def test_messages_keep_the_poll_schedule(
     assert coordinator._unsub_refresh is scheduled
 
 
+async def test_unchanged_messages_dont_update_entities(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+) -> None:
+    """A message that changes no value (only its timestamp) doesn't notify entities."""
+    coordinator = setup_entry.runtime_data
+    updates = []
+    unsub = coordinator.async_add_listener(lambda: updates.append(1))
+    cloud.mqtt.deliver({"usbc_1_power": 9.0})
+    await hass.async_block_till_done()
+    assert len(updates) == 1
+    cloud.mqtt.deliver({"usbc_1_power": 9.0})
+    await hass.async_block_till_done()
+    assert len(updates) == 1
+    unsub()
+
+
 async def test_mqtt_reconnects_after_disconnect(
     hass: HomeAssistant,
     cloud: FakeCloud,

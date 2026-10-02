@@ -117,6 +117,13 @@ charger only shows images from Anker's storage (one served by Home Assistant was
 
 ## Not found
 
+- **Local network access (2026-10-02):** the charger answers ping on the LAN, but a scan of all
+  65,535 TCP ports found none open; it silently drops every connection (no reset), as it does for
+  24 common UDP ports (DNS, NTP, SNMP, SSDP, mDNS, CoAP, Tuya-style 6666-6668, HF 48899, …). It
+  doesn't announce itself over mDNS or SSDP. So there is no local API: everything goes through the
+  Anker cloud. Anker's user guide likewise lists only Bluetooth LE, for Wi-Fi setup, as an exposed
+  interface.
+
 - **Renaming the charger:** `app/devicerelation/up_alias_name` needs `device_sn` + `alias_name` but
   answers "(10003) Failed to request"; five other candidates don't exist.
 - **Energy statistics:** `power/get_day_power_data` refuses every date format tried. The charger

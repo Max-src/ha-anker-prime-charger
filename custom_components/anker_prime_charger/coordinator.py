@@ -12,7 +12,8 @@ Messages arrive on paho's network thread; they are handed to the event loop
 before the library stores them, so the cache is only touched from the loop.
 Values that arrive between polls are pushed to the entities without moving
 the poll schedule (a message every second during fast updates must not
-postpone the status requests).
+postpone the status requests), once per message, and only when a value
+changed.
 
 Settings that live in the Anker cloud are handled by cloud.CloudSettings,
 refreshed in the background.
@@ -59,6 +60,8 @@ MIN_STALE_TIME: Final = timedelta(seconds=90)
 # The theme message (theme link, time display) only comes when asked, and only
 # changes with a theme command or from the app: ask on every Nth poll.
 THEME_REQUEST_POLLS: Final = 10
+# Keys the library changes on every message: not a change of the charger's values
+MESSAGE_KEYS: Final = ("last_update",)
 # This charger's real-time trigger lasts 10 s (measured: 10 messages, one per
 # second), so it is resent every 8 s while fast updates are on.
 FAST_UPDATE_INTERVAL: Final = timedelta(seconds=8)
@@ -100,6 +103,9 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._polls = 0
         self._cloud_task: asyncio.Task[None] | None = None
         self._egg_listeners: set[Callable[[int], None]] = set()
+        # While the library handles a message: whether it reported new values
+        self._in_message = False
+        self._message_changed = False
         # Fast updates: the real-time trigger, resent until fast_updates_until
         self.fast_updates_until: datetime | None = None
         self._fast_unsubs: list[CALLBACK_TYPE] = []
@@ -165,13 +171,21 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         Values decoded thanks to mqtt_extensions.py are dropped by the library.
         """
-        self.api.mqtt_received(*args, **kwargs)
+        self._in_message, self._message_changed = True, False
+        try:
+            self.api.mqtt_received(*args, **kwargs)
+        finally:
+            self._in_message = False
+        changed = self._message_changed
         device_sn, values = args[5], args[6]
         if device_sn == self.device_sn and values:
-            self._async_extra_values(values)
+            changed = self._async_extra_values(values) or changed
+        if changed:
+            self._async_handle_mqtt_update()
 
     @callback
-    def _async_extra_values(self, values: dict[str, Any]) -> None:
+    def _async_extra_values(self, values: dict[str, Any]) -> bool:
+        """Fire hidden animations and store our values; whether any changed."""
         if (egg := to_int(values.get(EASTER_EGG_STATE))) is not None:
             # An event, not a state: every message counts, even the same type
             for listener in list(self._egg_listeners):
@@ -180,19 +194,24 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             key: values[key] for key in EXTRA_STATE_KEYS if values.get(key) is not None
         }
         mqtt_data = self.device.get("mqtt_data")
-        if extra and mqtt_data is not None:
-            changed = any(mqtt_data.get(key) != value for key, value in extra.items())
-            mqtt_data.update(extra)
-            if changed:
-                self._async_handle_mqtt_update()
+        if not extra or mqtt_data is None:
+            return False
+        changed = any(mqtt_data.get(key) != value for key, value in extra.items())
+        mqtt_data.update(extra)
+        return changed
 
     @callback
     def _mqtt_update(self, sn: str | None = None, *args: Any, **kwargs: Any) -> None:
         """The library updated the charger's values.
 
-        Only called from api.mqtt_received, which runs in _async_mqtt_message.
+        Called from api.mqtt_received in _async_mqtt_message, which then pushes
+        once for the whole message.
         """
-        if sn == self.device_sn:
+        if sn != self.device_sn:
+            return
+        if self._in_message:
+            self._message_changed = True
+        else:
             self._async_handle_mqtt_update()
 
     @callback
@@ -200,17 +219,22 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """A message from the charger: it is reachable, push its values."""
         self.last_message = dt_util.utcnow()
         self._got_data.set()
+        recovered = not self.last_update_success
         self.last_update_success = True
-        self._async_push()
+        self._async_push(force=recovered)
 
     @callback
-    def _async_push(self) -> None:
+    def _async_push(self, force: bool = False) -> None:
         """Hand the current values to the entities, keeping the poll schedule.
 
-        (async_set_updated_data would restart the poll interval.)
+        (async_set_updated_data would restart the poll interval.) Entities are
+        only updated when a value changed, or with `force`.
         """
-        self.data = self._snapshot()
-        self.async_update_listeners()
+        data = self._snapshot()
+        unchanged = self.data is not None and _values(data) == _values(self.data)
+        self.data = data
+        if force or not unchanged:
+            self.async_update_listeners()
 
     def _snapshot(self) -> dict[str, Any]:
         """Copy of the charger's decoded values."""
@@ -383,3 +407,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Stop fast updates and disconnect MQTT (paho joins a thread: off-loop)."""
         self._stop_fast_updates()
         await self.hass.async_add_executor_job(self.api.stopMqttSession)
+
+
+def _values(data: dict[str, Any]) -> dict[str, Any]:
+    """The charger's values, without the keys that change with every message."""
+    return {k: v for k, v in data.items() if k not in MESSAGE_KEYS}
