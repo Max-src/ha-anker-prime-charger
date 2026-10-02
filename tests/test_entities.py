@@ -106,11 +106,20 @@ async def test_energy_is_restored(
     hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
 ) -> None:
     """The total continues from where it was before the restart."""
+    # pre-register so the restore cache targets the entity's real entity_id,
+    # whatever Home Assistant currently derives it as
+    eid = (
+        er.async_get(hass)
+        .async_get_or_create(
+            "sensor", DOMAIN, f"{SN}_usbc_1_energy", config_entry=entry
+        )
+        .entity_id
+    )
     mock_restore_cache_with_extra_data(
         hass,
         [
             (
-                State("sensor.250w_prime_charger_usb_c_1_energy", "1.5"),
+                State(eid, "1.5"),
                 {"native_value": 1.5, "native_unit_of_measurement": "kWh"},
             )
         ],

@@ -1,9 +1,8 @@
 # Profile settings fields: defined once (in save_custom_profile), reused below
 save_custom_profile:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
-      model_id: A2345
   fields:
     profile:
       required: true
@@ -63,9 +62,8 @@ save_custom_profile:
     c4_protocols: *protocols
 create_custom_profile:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
-      model_id: A2345
   fields:
     name:
       required: true
@@ -84,9 +82,8 @@ create_custom_profile:
     c4_protocols: *protocols
 set_custom_settings:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
-      model_id: A2345
   fields:
     auto_deactivation: *auto_deactivation
     c1_power: *c1_power
@@ -100,9 +97,8 @@ set_custom_settings:
     c4_protocols: *protocols
 delete_custom_profile:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
-      model_id: A2345
   fields:
     profile:
       required: true
@@ -111,7 +107,7 @@ delete_custom_profile:
         text:
 set_days:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
   fields:
     schedule:
@@ -140,7 +136,7 @@ set_days:
           - sun
 set_protocols:
   target:
-    device:
+    entity:
       integration: anker_prime_charger
   fields:
     protocols: *protocols
