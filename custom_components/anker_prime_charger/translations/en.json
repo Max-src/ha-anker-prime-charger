@@ -315,7 +315,7 @@
   "services": {
     "save_custom_profile": {
       "name": "Save custom profile",
-      "description": "Change a custom charging profile saved in the Anker cloud (the app's custom modes): its name, port powers, protocols and automatic deactivation. Unset fields keep their value. Doesn't apply it to the charger; select it in Charging mode for that.",
+      "description": "Change a custom charging profile saved in the Anker cloud (the app's custom modes): its name, port powers, protocols and automatic deactivation. Unset fields keep their value. Doesn't apply it to the charger; select it in Charging mode for that. Target the charger.",
       "fields": {
         "profile": {
           "name": "Profile",
@@ -373,7 +373,7 @@
     },
     "create_custom_profile": {
       "name": "Create custom profile",
-      "description": "Create a custom charging profile in the Anker cloud (at most 4), from the charger's current custom settings (the custom power limit, protocol and automatic deactivation entities); the fields change them. Doesn't apply it; select it in Charging mode for that.",
+      "description": "Create a custom charging profile in the Anker cloud (at most 4), from the charger's current custom settings (the custom power limit, protocol and automatic deactivation entities); the fields change them. Doesn't apply it; select it in Charging mode for that. Target the charger.",
       "fields": {
         "name": {
           "name": "Name",
@@ -423,7 +423,7 @@
     },
     "set_custom_settings": {
       "name": "Set custom settings",
-      "description": "Change several of the charger's custom charging mode settings at once: port power limits, protocols and automatic deactivation. Unset fields keep their value. Sent in one command, so the charger cuts and renegotiates all ports only once (any custom-mode change does that, also in the app). Switches the charger to the custom mode; nothing is sent if nothing changes.",
+      "description": "Change several of the charger's custom charging mode settings at once: port power limits, protocols and automatic deactivation. Unset fields keep their value. Sent in one command, so the charger cuts and renegotiates all ports only once (any custom-mode change does that, also in the app). Switches the charger to the custom mode; nothing is sent if nothing changes. Target the charger.",
       "fields": {
         "auto_deactivation": {
           "name": "Automatic deactivation",
@@ -469,7 +469,7 @@
     },
     "delete_custom_profile": {
       "name": "Delete custom profile",
-      "description": "Delete a custom charging profile from the Anker cloud.",
+      "description": "Delete a custom charging profile from the Anker cloud. Target the charger.",
       "fields": {
         "profile": {
           "name": "Profile",
@@ -479,17 +479,21 @@
     },
     "set_days": {
       "name": "Set days",
-      "description": "Set the weekdays of a port's scheduled start or end, or of the clock display. Target the matching days entity (e.g. USB-C 1 Schedule end days).",
+      "description": "Set the weekdays of a schedule with a day picker: target a port and choose its scheduled start or end, or target the charger for the clock display days.",
       "fields": {
         "days": {
           "name": "Days",
           "description": "The days to set. None selected: no day."
+        },
+        "schedule": {
+          "name": "Schedule",
+          "description": "For a port: the scheduled start or end. Not used for the charger."
         }
       }
     },
     "set_protocols": {
       "name": "Set protocols",
-      "description": "Set the fast-charging protocols a USB-C port allows in the custom charging mode. Target the port's Custom protocols entity. Which protocols are possible depends on the port's custom power (attribute 'allowed'). Re-applies the custom mode, which briefly disconnects the charging devices.",
+      "description": "Set the fast-charging protocols a USB-C port allows in the custom charging mode. Target the USB-C port. Which protocols are possible depends on the port's custom power (attribute 'allowed'). Re-applies the custom mode, which briefly disconnects the charging devices.",
       "fields": {
         "protocols": {
           "name": "Protocols",
@@ -520,6 +524,12 @@
         "pps20v": "4.5-21V PPS",
         "huawei": "Huawei",
         "xiaomi": "Xiaomi HyperCharge"
+      }
+    },
+    "schedule_part": {
+      "options": {
+        "start": "Scheduled start",
+        "end": "Scheduled end"
       }
     }
   },
@@ -599,17 +609,20 @@
     "unknown_theme": {
       "message": "Unknown clock theme {theme}"
     },
-    "target_charging_mode": {
-      "message": "Target the charger's \"Charging mode\" entity with this action"
-    },
-    "target_days": {
-      "message": "Target a \"... days\" entity (schedule start/end days, clock display days) with this action"
-    },
     "invalid_list": {
       "message": "Invalid value {value}: use {example}, all or none (possible: {possible})"
     },
-    "target_protocols": {
-      "message": "Target a USB-C port's \"Custom protocols\" entity with this action"
+    "no_target": {
+      "message": "Target an Anker Prime Charger device (or one of its ports) with this action"
+    },
+    "target_charger": {
+      "message": "Target the charger's device with this action, not a port"
+    },
+    "target_usb_c_port": {
+      "message": "Target a USB-C port's device with this action"
+    },
+    "schedule_required": {
+      "message": "Choose the schedule (start or end) when targeting a port"
     }
   }
 }

@@ -195,7 +195,8 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
         power = self._power() if self.coordinator.last_update_success else None
         if self._last is not None and power is not None:
             since, last_power = self._last
-            hours = (now - since).total_seconds() / 3600
+            # a clock set back must not lower the total (seen as a meter reset)
+            hours = max((now - since).total_seconds(), 0) / 3600
             self._energy += max(last_power, 0.0) * hours / 1000
         self._last = None if power is None else (now, power)
 

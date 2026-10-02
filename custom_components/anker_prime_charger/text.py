@@ -12,7 +12,7 @@ from typing import Any
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import custom_mode, schedules
@@ -71,7 +71,7 @@ class WeekdaysText(PrimeChargerEntity, TextEntity):
     """Weekdays, e.g. "mon,tue,wed,thu,fri"; 3-letter English names, "all" or "none".
 
     Days of a port's scheduled start or end (see schedules.py), or (no port)
-    days on which the clock screen is shown. Also set by the "Set days" action.
+    days on which the clock screen is shown.
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -97,12 +97,11 @@ class WeekdaysText(PrimeChargerEntity, TextEntity):
 
     async def async_set_value(self, value: str) -> None:
         """Set the days."""
-        await self.async_set_days(parse_list(value, WEEKDAYS, "e.g. mon,tue,wed"))
-
-    async def async_set_days(self, days: list[str]) -> None:
-        """Send the days (in any order) to the charger."""
         await schedules.async_set_days(
-            self.coordinator, self.port.key if self.port else None, self._part, days
+            self.coordinator,
+            self.port.key if self.port else None,
+            self._part,
+            parse_list(value, WEEKDAYS, "e.g. mon,tue,wed"),
         )
 
 
@@ -142,17 +141,13 @@ class PortProtocols(PrimeChargerEntity, TextEntity):
     async def async_set_value(self, value: str) -> None:
         """Allow exactly these protocols."""
         allowed = self._allowed()
-        names = parse_list(
-            value,
-            custom_mode.PROTOCOLS
-            if value.strip().lower() != "all" or allowed is None
-            else allowed,
-            "e.g. scp,ufcs,pps11v",
-        )
-        await self.async_set_protocols(names)
-
-    async def async_set_protocols(self, names: list[str]) -> None:
-        """Allow exactly these protocols (also from the "Set protocols" action)."""
+        if value.strip().lower() == "all":
+            # all that the port's power allows: needs the cloud's table
+            if allowed is None:
+                raise translated(HomeAssistantError, "not_reported")
+            names = list(allowed)
+        else:
+            names = parse_list(value, custom_mode.PROTOCOLS, "e.g. scp,ufcs,pps11v")
         await custom_mode.async_apply(
             self.coordinator, protocols={self.port.custom: names}
         )

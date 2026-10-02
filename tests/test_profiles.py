@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 
 from .conftest import FakeCloud
-from .helpers import entity_id
+from .helpers import act, device_id, entity_id
 
 UPDATE = "mini_power/v1/app/charging/update_charging_mode"
 
@@ -136,12 +136,7 @@ async def test_save_profile_checks(
 
 
 async def call_profile_action(hass: HomeAssistant, action: str, **data: Any) -> None:
-    await hass.services.async_call(
-        DOMAIN,
-        action,
-        {ATTR_ENTITY_ID: entity_id(hass, "select", "usage_mode"), **data},
-        blocking=True,
-    )
+    await act(hass, action, device_id(hass), **data)
 
 
 def requests(cloud: FakeCloud, name: str) -> list[dict[str, Any]]:
@@ -226,14 +221,13 @@ async def test_actions_exist_without_a_charger(hass: HomeAssistant) -> None:
         assert hass.services.has_service(DOMAIN, action)
 
 
-async def test_actions_need_the_charging_mode_entity(
+async def test_actions_need_the_charger(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
-    """Targeting another of the charger's selects is refused with a clear message."""
-    with pytest.raises(ServiceValidationError, match="Charging mode"):
-        await hass.services.async_call(
-            DOMAIN,
-            "delete_custom_profile",
-            {ATTR_ENTITY_ID: entity_id(hass, "select", "knob_mode"), "profile": "Desk"},
-            blocking=True,
+    """Charger actions refuse a port, or a device that isn't one of ours."""
+    with pytest.raises(ServiceValidationError, match="not a port"):
+        await act(
+            hass, "delete_custom_profile", device_id(hass, "usbc_1"), profile="Desk"
         )
+    with pytest.raises(ServiceValidationError, match="Target an Anker"):
+        await act(hass, "delete_custom_profile", "not_our_device", profile="Desk")

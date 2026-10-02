@@ -14,11 +14,19 @@ from pytest_homeassistant_custom_component.common import (
 
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .conftest import TIMER_REPORTED, FakeCloud
-from .helpers import attr, call, entity_id, last_command_field, state
+from .helpers import (
+    act,
+    attr,
+    call,
+    device_id,
+    entity_id,
+    last_command_field,
+    state,
+)
 
 WEEKDAYS_MON_FRI = ["mon", "tue", "wed", "thu", "fri"]
 
@@ -163,32 +171,38 @@ async def test_schedule_days_custom_is_restored(
 async def test_set_days_action(
     hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
 ) -> None:
-    """The Set days action sends the picked days in weekday order."""
+    """Set days: a port's schedule start or end, or the charger's clock display."""
     days = entity_id(hass, "text", "usbc_2_end_weekdays")
-    await call(
-        hass, "anker_prime_charger", "set_days", days, days=["fri", "mon", "wed"]
-    )
+    port = device_id(hass, "usbc_2")
+    await act(hass, "set_days", port, schedule="end", days=["fri", "mon", "wed"])
     assert commands[-1][0] == "usbc_2_end_time"
     assert commands[-1][1]["set_port_time_weekdays"] == ["mon", "wed", "fri"]
     assert hass.states.get(days).state == "mon,wed,fri"
 
-    await call(hass, "anker_prime_charger", "set_days", days)
+    await act(hass, "set_days", port, schedule="end")
     assert commands[-1][1]["set_port_time_weekdays"] == []
 
-    clock = entity_id(hass, "text", "clock_display_weekdays")
-    await call(hass, "anker_prime_charger", "set_days", clock, days=["sun"])
+    await act(hass, "set_days", device_id(hass), days=["sun"])
     assert commands[-1][0] == "clock_display_schedule"
     assert commands[-1][1]["set_clock_display_weekdays"] == ["sun"]
     assert state(hass, "select", "clock_display_weekdays_preset") == "custom"
 
-    with pytest.raises(ServiceValidationError):
-        await call(
-            hass,
-            "anker_prime_charger",
-            "set_days",
-            entity_id(hass, "text", "port_label_c1"),
-            days=["mon"],
-        )
+    # several ports at once
+    sent = len(commands)
+    await hass.services.async_call(
+        "anker_prime_charger",
+        "set_days",
+        {
+            "device_id": [device_id(hass, "usbc_3"), device_id(hass, "usba")],
+            "schedule": "start",
+            "days": ["sat"],
+        },
+        blocking=True,
+    )
+    assert [c[0] for c in commands[sent:]] == ["usba_start_time", "usbc_3_start_time"]
+
+    with pytest.raises(ServiceValidationError, match="start or end"):
+        await act(hass, "set_days", port, days=["mon"])
 
 
 async def test_custom_protocols(
@@ -284,29 +298,38 @@ async def test_custom_protocols_preset(
 async def test_set_protocols_action(
     hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
 ) -> None:
-    """The Set protocols action allows exactly the picked protocols."""
+    """The Set protocols action allows exactly the picked protocols on a USB-C port."""
     eid = entity_id(hass, "text", "custom_usb_c1_protocols")
-    await call(
-        hass, "anker_prime_charger", "set_protocols", eid, protocols=["scp", "ufcs"]
-    )
+    port = device_id(hass, "usbc_1")
+    await act(hass, "set_protocols", port, protocols=["scp", "ufcs"])
     assert commands[-1][1]["set_usb_c1_protocols"] == ["scp", "ufcs"]
     assert hass.states.get(eid).state == "scp,ufcs"
 
-    await call(hass, "anker_prime_charger", "set_protocols", eid)
+    await act(hass, "set_protocols", port)
     assert commands[-1][1]["set_usb_c1_protocols"] == []
 
     with pytest.raises(ServiceValidationError, match="doesn't allow huawei"):
-        await call(
-            hass, "anker_prime_charger", "set_protocols", eid, protocols=["huawei"]
-        )
-    with pytest.raises(ServiceValidationError):
+        await act(hass, "set_protocols", port, protocols=["huawei"])
+    for other in (device_id(hass, "usba"), device_id(hass)):
+        with pytest.raises(ServiceValidationError, match="USB-C port"):
+            await act(hass, "set_protocols", other, protocols=["ufcs"])
+
+
+async def test_custom_protocols_all_needs_the_table(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """ "all" needs the cloud's protocol table; without it nothing is sent."""
+    setup_entry.runtime_data.cloud.protocol_ranges = {}
+    sent = len(commands)
+    with pytest.raises(HomeAssistantError, match="not reported this yet"):
         await call(
             hass,
-            "anker_prime_charger",
-            "set_protocols",
-            entity_id(hass, "text", "port_label_c1"),
-            protocols=["ufcs"],
+            "text",
+            "set_value",
+            entity_id(hass, "text", "custom_usb_c1_protocols"),
+            value="all",
         )
+    assert len(commands) == sent
 
 
 async def test_fast_updates(

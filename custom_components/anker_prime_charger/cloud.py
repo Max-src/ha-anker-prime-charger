@@ -55,6 +55,8 @@ class CloudSettings:
         self.api = api
         self.device_sn = device_sn
         self.refreshed: datetime | None = None
+        # +1 after each refresh: lets entities skip work when nothing was read
+        self.generation = 0
         self._stock_themes_refreshed: datetime | None = None
         # Unlocked hidden animations: [{"egg_type", "trigger_time", "status"}]
         self.easter_eggs: list[dict[str, Any]] | None = None
@@ -119,6 +121,7 @@ class CloudSettings:
                     "Unexpected answer from the Anker cloud for the %s", what
                 )
         themes.name_unnamed_custom_themes(self._device.get("screensaver") or {})
+        self.generation += 1
 
     async def _async_read_easter_eggs(self) -> None:
         data = await library.async_request(
