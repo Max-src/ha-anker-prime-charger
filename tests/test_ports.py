@@ -12,12 +12,14 @@ from pytest_homeassistant_custom_component.common import (
     mock_restore_cache,
 )
 
+from custom_components.anker_prime_charger.const import DOMAIN
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .conftest import TIMER_REPORTED, FakeCloud
+from .conftest import SN, TIMER_REPORTED, FakeCloud
 from .helpers import (
     act,
     attr,
@@ -157,10 +159,16 @@ async def test_schedule_days_custom_is_restored(
     hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
 ) -> None:
     """Custom picked before a restart stays custom while the days are the same."""
-    mock_restore_cache(
-        hass,
-        [State("select.250w_prime_charger_usb_a_schedule_start_days_preset", "custom")],
+    # pre-register so the restore cache targets the entity's real entity_id,
+    # whatever Home Assistant currently derives it as
+    eid = (
+        er.async_get(hass)
+        .async_get_or_create(
+            "select", DOMAIN, f"{SN}_usba_start_weekdays_preset", config_entry=entry
+        )
+        .entity_id
     )
+    mock_restore_cache(hass, [State(eid, "custom")])
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     # the fixture's days are Monday to Friday, which is otherwise "weekdays"
