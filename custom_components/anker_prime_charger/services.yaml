@@ -40,23 +40,23 @@ save_custom_profile:
       selector:
         select:
           options:
-          - '0'
-          - '15'
-          - '24'
+            - "0"
+            - "15"
+            - "24"
     c1_protocols: &protocols
       selector:
         select:
           multiple: true
           translation_key: protocol
           options:
-          - scp
-          - ufcs
-          - pd12v
-          - pps11v
-          - pps16v
-          - pps20v
-          - huawei
-          - xiaomi
+            - scp
+            - ufcs
+            - pd12v
+            - pps11v
+            - pps16v
+            - pps20v
+            - huawei
+            - xiaomi
     c2_protocols: *protocols
     c3_protocols: *protocols
     c4_protocols: *protocols
@@ -115,25 +115,25 @@ set_days:
         select:
           translation_key: schedule_part
           options:
-          - start
-          - end
+            - start
+            - end
     days:
       example:
-      - mon
-      - wed
-      - fri
+        - mon
+        - wed
+        - fri
       selector:
         select:
           multiple: true
           translation_key: weekday
           options:
-          - mon
-          - tue
-          - wed
-          - thu
-          - fri
-          - sat
-          - sun
+            - mon
+            - tue
+            - wed
+            - thu
+            - fri
+            - sat
+            - sun
 set_protocols:
   target:
     entity:

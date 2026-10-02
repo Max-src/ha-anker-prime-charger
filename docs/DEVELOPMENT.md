@@ -92,7 +92,7 @@ masked; git-ignored) next to it.
 
 | Script | Purpose |
 |---|---|
-| `watch_charger` | Read-only. Snapshots while you use the app: the app's commands to the charger, what the charger reports, which bytes changed. The way to decode new settings |
+| `watch_charger` | Read-only. Snapshots while you use the app: the app's commands to the charger, what the charger reports, which bytes changed, and any port whose power dropped (live port values every second). The way to decode new settings. `watch_charger.ps1 <name>` writes `watch_charger_<name>_results.json`, keeping earlier captures |
 | `validate` | Whether cloud-side settings (protocols per mode, test features) actually reach the charger |
 | `probe_cloud` | Found the test features' request format |
 | `probe_themes` | Clock image format and the custom image endpoints |
