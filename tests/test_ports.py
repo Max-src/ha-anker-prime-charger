@@ -190,7 +190,7 @@ async def test_set_days_action(
     await act(hass, "set_days", port, schedule="end")
     assert commands[-1][1]["set_port_time_weekdays"] == []
 
-    await act(hass, "set_days", device_id(hass), days=["sun"])
+    await act(hass, "set_days", device_id(hass, "screen"), days=["sun"])
     assert commands[-1][0] == "clock_display_schedule"
     assert commands[-1][1]["set_clock_display_weekdays"] == ["sun"]
     assert state(hass, "select", "clock_display_weekdays_preset") == "custom"

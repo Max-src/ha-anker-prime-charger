@@ -29,20 +29,18 @@ from typing import Any, Final
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .cloud import CloudSettings
 from .const import (
-    CONF_FAST_UPDATES_MINUTES,
     CONF_SCAN_INTERVAL,
-    DEFAULT_FAST_UPDATES_MINUTES,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     LOGGER,
     MODEL_NAME,
 )
+from .fast_updates import FastUpdates
 from .helpers import to_int, translated
 from .mqtt_extensions import EASTER_EGG_STATE, EXTRA_STATE_KEYS
 from .solixapi.api import AnkerSolixApi
@@ -62,9 +60,6 @@ MIN_STALE_TIME: Final = timedelta(seconds=90)
 THEME_REQUEST_POLLS: Final = 10
 # Keys the library changes on every message: not a change of the charger's values
 MESSAGE_KEYS: Final = ("last_update",)
-# This charger's real-time trigger lasts 10 s (measured: 10 messages, one per
-# second), so it is resent every 8 s while fast updates are on.
-FAST_UPDATE_INTERVAL: Final = timedelta(seconds=8)
 
 
 class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -106,10 +101,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # While the library handles a message: whether it reported new values
         self._in_message = False
         self._message_changed = False
-        # Fast updates: the real-time trigger, resent until fast_updates_until
-        self.fast_updates_until: datetime | None = None
-        self._fast_unsubs: list[CALLBACK_TYPE] = []
-        self._fast_error_logged = False
+        self.fast_updates = FastUpdates(self)
 
     @property
     def device(self) -> dict[str, Any]:
@@ -123,8 +115,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # --- MQTT -----------------------------------------------------------------
 
-    async def _async_ensure_mqtt(self) -> SolixMqttDeviceCharger:
-        """(Re)connect to the MQTT broker and subscribe to the charger topics."""
+    async def async_ensure_mqtt(self) -> SolixMqttDeviceCharger:
+        """(Re)connect to the MQTT broker and subscribe; return the charger's MQTT device."""
         session = self.api.mqttsession
         if not (session and session.is_connected()):
             LOGGER.debug("Connecting to Anker MQTT server")
@@ -262,7 +254,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The reply arrives asynchronously through the MQTT callback, so this
         mostly returns the values we already have.
         """
-        mdev = await self._async_ensure_mqtt()
+        mdev = await self.async_ensure_mqtt()
         if await mdev.status_request() is None:
             raise translated(UpdateFailed, "status_request_failed")
         if self._polls % THEME_REQUEST_POLLS == 0:
@@ -325,7 +317,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         command is applied. `expected` adds states the library cannot infer
         (e.g. per-port priority flags derived from a port bitmask).
         """
-        mdev = await self._async_ensure_mqtt()
+        mdev = await self.async_ensure_mqtt()
         resp = await mdev.run_command(
             cmd=cmd, value=value, parm=parm, parm_map=dict(parm_map or {})
         )
@@ -333,7 +325,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_set_custom_profile(self, number: int | str) -> None:
         """Apply a saved custom profile (the library builds the command from it)."""
-        mdev = await self._async_ensure_mqtt()
+        mdev = await self.async_ensure_mqtt()
         resp = await mdev.set_custom_usage_profile(number=number)
         self._async_apply_reply(resp, f"custom profile {number}")
 
@@ -352,60 +344,9 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             mqtt_data.update({k: v for k, v in updates.items() if k in mqtt_data})
             self._async_push()
 
-    # --- Fast updates ---------------------------------------------------------
-
-    @property
-    def fast_updates(self) -> bool:
-        """Whether fast updates (port values every second) are on."""
-        return self.fast_updates_until is not None
-
-    async def async_set_fast_updates(self, enabled: bool) -> None:
-        """Turn fast updates on (they stop by themselves after a while) or off."""
-        if enabled and not self.fast_updates:
-            minutes = self.config_entry.options.get(
-                CONF_FAST_UPDATES_MINUTES, DEFAULT_FAST_UPDATES_MINUTES
-            )
-            duration = timedelta(minutes=minutes)
-            self.fast_updates_until = dt_util.utcnow() + duration
-            self._fast_error_logged = False
-            self._fast_unsubs = [
-                async_track_time_interval(
-                    self.hass, self._async_fast_tick, FAST_UPDATE_INTERVAL
-                ),
-                async_call_later(self.hass, duration, self._async_fast_updates_expired),
-            ]
-            await self._async_fast_tick()
-        elif not enabled:
-            self._stop_fast_updates()
-        self.async_update_listeners()
-
-    async def _async_fast_tick(self, _now: datetime | None = None) -> None:
-        try:
-            mdev = await self._async_ensure_mqtt()
-            if await mdev.realtime_trigger() is None:
-                raise HomeAssistantError("the real-time trigger could not be sent")
-        except (HomeAssistantError, UpdateFailed) as err:
-            # Keep trying (the connection may come back), but log it only once
-            if not self._fast_error_logged:
-                LOGGER.warning("Fast updates: %s", err)
-                self._fast_error_logged = True
-        else:
-            self._fast_error_logged = False
-
-    @callback
-    def _async_fast_updates_expired(self, _now: datetime) -> None:
-        self._stop_fast_updates()
-        self.async_update_listeners()
-
-    def _stop_fast_updates(self) -> None:
-        for unsub in self._fast_unsubs:
-            unsub()
-        self._fast_unsubs = []
-        self.fast_updates_until = None
-
     async def async_stop(self) -> None:
         """Stop fast updates and disconnect MQTT (paho joins a thread: off-loop)."""
-        self._stop_fast_updates()
+        self.fast_updates.stop()
         await self.hass.async_add_executor_job(self.api.stopMqttSession)
 
 

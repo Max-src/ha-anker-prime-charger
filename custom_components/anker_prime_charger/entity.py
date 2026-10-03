@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER, MODEL, MODEL_NAME
+from .const import DOMAIN, MANUFACTURER, MODEL, MODEL_NAME, SCREEN, SCREEN_LABEL
 from .coordinator import PrimeChargerCoordinator
 from .ports import Port, port_device_info
 
@@ -15,8 +15,10 @@ from .ports import Port, port_device_info
 class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
     """Entity bound to one value the charger reports (its "key").
 
-    Entities of a port go on that port's device, the others on the charger's.
-    The unique id is "<serial>_<unique_key>" (default: the key).
+    Entities of a port go on that port's device, those of the screen (display,
+    clock screensaver, knob, hidden animations) on the Screen device, the others
+    on the charger's. The unique id is "<serial>_<unique_key>" (default: the
+    key); moving an entity to another device keeps it.
 
     Available while the charger is reachable and has reported the key; entities
     that don't show a reported value set _needs_key = False (and may add their
@@ -33,6 +35,7 @@ class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
         port: Port | None = None,
         *,
         unique_key: str | None = None,
+        screen: bool = False,
     ) -> None:
         """Initialize."""
         super().__init__(coordinator)
@@ -40,7 +43,9 @@ class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
         self.port = port
         sn = coordinator.device_sn
         self._attr_unique_id = f"{sn}_{unique_key or key}"
-        if port is None:
+        if screen:
+            self._attr_device_info = screen_device_info(coordinator)
+        elif port is None:
             self._attr_device_info = charger_device_info(coordinator)
         else:
             self._attr_device_info = port_device_info(
@@ -70,4 +75,13 @@ def charger_device_info(coordinator: PrimeChargerCoordinator) -> DeviceInfo:
         name=coordinator.charger_name,
         serial_number=coordinator.device_sn,
         sw_version=coordinator.device.get("sw_version") or None,
+    )
+
+
+def screen_device_info(coordinator: PrimeChargerCoordinator) -> ChildDeviceInfo:
+    """The charger's screen: a child device of the charger's device, like the ports."""
+    return ChildDeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.device_sn}_{SCREEN}")},
+        name=f"{coordinator.charger_name} {SCREEN_LABEL}",
+        parent_device_id=coordinator.charger_device_id,
     )

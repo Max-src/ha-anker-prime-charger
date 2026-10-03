@@ -21,17 +21,27 @@
         "data": {
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Change the Anker login",
+        "description": "Log in with the Anker account that owns this charger (serial {serial}). To add a different charger, add the integration again instead.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
       }
     },
     "error": {
       "invalid_auth": "Invalid email or password.",
       "cannot_connect": "Could not reach the Anker cloud.",
       "no_devices": "No supported charger found in this account. Supported so far: Anker Prime Charger 250W (A2345).",
-      "unknown": "Unexpected error, check the logs."
+      "unknown": "Unexpected error, check the logs.",
+      "charger_not_in_account": "This account doesn't own the charger this entry is for. Use the account that owns it, or add the other charger as a new entry."
     },
     "abort": {
       "already_configured": "This charger is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "The login was changed."
     }
   },
   "options": {
@@ -80,7 +90,7 @@
     },
     "number": {
       "display_brightness": {
-        "name": "Display brightness"
+        "name": "Brightness"
       },
       "custom_power_limit": {
         "name": "Custom power limit"
@@ -91,7 +101,7 @@
     },
     "select": {
       "clock_display_days_preset": {
-        "name": "Clock display days preset",
+        "name": "Clock screensaver days preset",
         "state": {
           "every_day": "Every day",
           "weekdays": "Weekdays",
@@ -130,9 +140,9 @@
         }
       },
       "display_timeout_mode": {
-        "name": "Display timeout",
+        "name": "Timeout",
         "state": {
-          "never": "Never",
+          "never": "Always on",
           "30s": "30 seconds",
           "1min": "1 minute",
           "5min": "5 minutes",
@@ -140,7 +150,7 @@
         }
       },
       "knob_mode": {
-        "name": "Knob direction",
+        "name": "Knob orientation",
         "state": {
           "forward": "Forward",
           "backward": "Backward"
@@ -241,13 +251,13 @@
     },
     "switch": {
       "clock_switch": {
-        "name": "Clock display"
+        "name": "Clock screensaver"
       },
       "time_display": {
         "name": "Time display"
       },
       "holiday_switch": {
-        "name": "Holiday updates"
+        "name": "Holiday screensaver"
       },
       "auto_exit_switch": {
         "name": "Automatic deactivation"
@@ -276,7 +286,7 @@
     },
     "text": {
       "clock_display_days": {
-        "name": "Clock display days"
+        "name": "Clock screensaver days"
       },
       "label": {
         "name": "Label"
@@ -299,10 +309,10 @@
     },
     "time": {
       "clock_display_start": {
-        "name": "Clock display start"
+        "name": "Clock screensaver start"
       },
       "clock_display_end": {
-        "name": "Clock display end"
+        "name": "Clock screensaver end"
       },
       "schedule_start_time": {
         "name": "Schedule start time"
@@ -479,7 +489,7 @@
     },
     "set_days": {
       "name": "Set days",
-      "description": "Set the weekdays of a schedule with a day picker: target a port and choose its scheduled start or end, or target the charger for the clock display days.",
+      "description": "Set the weekdays of a schedule with a day picker: target a port and choose its scheduled start or end, or target the Screen device for the clock screensaver days.",
       "fields": {
         "days": {
           "name": "Days",
@@ -487,7 +497,7 @@
         },
         "schedule": {
           "name": "Schedule",
-          "description": "For a port: the scheduled start or end. Not used for the charger."
+          "description": "For a port: the scheduled start or end. Not used for the Screen device."
         }
       }
     },
@@ -613,16 +623,16 @@
       "message": "Invalid value {value}: use {example}, all or none (possible: {possible})"
     },
     "no_target": {
-      "message": "Target an Anker Prime Charger device (or one of its ports) with this action"
+      "message": "Target an Anker Prime Charger device (or one of its ports) with this action, or an area or label that contains one it applies to"
     },
     "target_charger": {
-      "message": "Target the charger's device with this action, not a port"
+      "message": "Target the charger's device with this action, not a port or the screen"
     },
     "target_usb_c_port": {
       "message": "Target a USB-C port's device with this action"
     },
     "schedule_required": {
-      "message": "Choose the schedule (start or end) when targeting a port"
+      "message": "Choose the schedule (start or end) when targeting a port; for the clock screensaver days, target the Screen device"
     }
   }
 }

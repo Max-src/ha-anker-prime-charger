@@ -1,8 +1,8 @@
 """Selects for the Anker Prime Charger integration.
 
-Charger: charging mode (built-in modes and custom profiles), priority ports,
-display timeout, knob direction, clock format, clock theme, clock display days
-preset.
+Charger: charging mode (built-in modes and custom profiles), priority ports.
+Screen: timeout, knob orientation, clock format, clock theme, clock screensaver
+days preset.
 Ports: USB-A custom power limit (0, 15 or 24 W), schedule days presets, custom
 protocols preset (the presets are in presets.py).
 """
@@ -46,6 +46,8 @@ class OptionSelectDescription(SelectEntityDescription):
     parameter: str
     # option -> (value the charger reports, value sent in the command)
     value_map: dict[str, tuple[int, str]]
+    # on the Screen device instead of the charger's
+    screen: bool = False
 
 
 USAGE_MODE: Final = OptionSelectDescription(
@@ -64,6 +66,7 @@ USAGE_MODE: Final = OptionSelectDescription(
 OPTION_SELECTS: Final[tuple[OptionSelectDescription, ...]] = (
     OptionSelectDescription(
         key="display_timeout_mode",
+        screen=True,
         translation_key="display_timeout_mode",
         entity_category=EntityCategory.CONFIG,
         command=SolixMqttCommands.display_timeout_mode_select,
@@ -78,6 +81,7 @@ OPTION_SELECTS: Final[tuple[OptionSelectDescription, ...]] = (
     ),
     OptionSelectDescription(
         key="knob_mode",
+        screen=True,
         translation_key="knob_mode",
         entity_category=EntityCategory.CONFIG,
         command=SolixMqttCommands.knob_mode_select,
@@ -86,6 +90,7 @@ OPTION_SELECTS: Final[tuple[OptionSelectDescription, ...]] = (
     ),
     OptionSelectDescription(
         key="clock_mode",
+        screen=True,
         translation_key="clock_mode",
         entity_category=EntityCategory.CONFIG,
         command=SolixMqttCommands.clock_mode_select,
@@ -130,7 +135,7 @@ class OptionSelect(PrimeChargerEntity, SelectEntity):
         self, coordinator: PrimeChargerCoordinator, description: OptionSelectDescription
     ) -> None:
         """Initialize."""
-        super().__init__(coordinator, description.key)
+        super().__init__(coordinator, description.key, screen=description.screen)
         self.entity_description = description
         self._attr_options = list(description.value_map)
 
@@ -262,7 +267,7 @@ class ClockThemeSelect(PrimeChargerEntity, SelectEntity):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "theme_id")
+        super().__init__(coordinator, "theme_id", screen=True)
         self._by_name: dict[str, dict[str, Any]] = {}
         self._themes_from: tuple[Any, ...] | None = None
         self._update_themes()

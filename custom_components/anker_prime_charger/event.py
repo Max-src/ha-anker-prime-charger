@@ -34,7 +34,7 @@ class HiddenAnimationEvent(PrimeChargerEntity, EventEntity):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "hidden_animation")
+        super().__init__(coordinator, "hidden_animation", screen=True)
 
     async def async_added_to_hass(self) -> None:
         """Listen for animations."""

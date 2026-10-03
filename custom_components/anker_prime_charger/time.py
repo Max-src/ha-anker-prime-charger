@@ -52,6 +52,7 @@ class ScheduleTime(PrimeChargerEntity, TimeEntity):
             f"{self._prefix}_hour",
             port,
             unique_key=f"{self._prefix}_time" if port else self._prefix,
+            screen=port is None,
         )
         self._part = part
         self._attr_translation_key = (

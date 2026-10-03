@@ -221,13 +221,65 @@ async def test_actions_exist_without_a_charger(hass: HomeAssistant) -> None:
         assert hass.services.has_service(DOMAIN, action)
 
 
+async def test_actions_target_areas(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """Areas and labels apply an action to the devices in them it suits."""
+    from homeassistant.helpers import (
+        area_registry as ar,
+        device_registry as dr,
+        label_registry as lr,
+    )
+
+    office = ar.async_get(hass).async_create("Office")
+    # the port devices follow the charger's area
+    dr.async_get(hass).async_update_device(device_id(hass), area_id=office.id)
+
+    # a charger action: the charger only, not its ports
+    await hass.services.async_call(
+        DOMAIN,
+        "set_custom_settings",
+        {"area_id": office.id, "c2_power": 45},
+        blocking=True,
+    )
+    assert len(commands) == 1
+    assert commands[0][1]["set_usb_c2_power_limit"] == 45
+
+    # a USB-C port action: each USB-C port (only C1 and C4 allow any protocol)
+    await hass.services.async_call(
+        DOMAIN, "set_protocols", {"area_id": office.id, "protocols": []}, blocking=True
+    )
+    assert len(commands) == 3
+    assert commands[1][1]["set_usb_c1_protocols"] == []
+    assert commands[2][1]["set_usb_c4_protocols"] == []
+
+    # Set days without a schedule: the clock screensaver days, once (the Screen
+    # device follows the charger's area too)
+    sent = len(commands)
+    await hass.services.async_call(
+        DOMAIN, "set_days", {"area_id": office.id, "days": ["sun"]}, blocking=True
+    )
+    assert [c[0] for c in commands[sent:]] == ["clock_display_schedule"]
+
+    # nothing of ours under the label: a clear error
+    empty = lr.async_get(hass).async_create("Empty")
+    with pytest.raises(ServiceValidationError, match="area or label"):
+        await hass.services.async_call(
+            DOMAIN,
+            "delete_custom_profile",
+            {"label_id": empty.label_id, "profile": "Desk"},
+            blocking=True,
+        )
+
+
 async def test_actions_need_the_charger(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
     """Charger actions refuse a port, or a device that isn't one of ours."""
-    with pytest.raises(ServiceValidationError, match="not a port"):
-        await act(
-            hass, "delete_custom_profile", device_id(hass, "usbc_1"), profile="Desk"
-        )
+    for other in ("usbc_1", "screen"):
+        with pytest.raises(ServiceValidationError, match="not a port or the screen"):
+            await act(
+                hass, "delete_custom_profile", device_id(hass, other), profile="Desk"
+            )
     with pytest.raises(ServiceValidationError, match="Target an Anker"):
         await act(hass, "delete_custom_profile", "not_our_device", profile="Desk")
