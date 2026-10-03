@@ -124,7 +124,7 @@ class ClockDisplaySwitch(ReportedSwitch):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "clock_switch")
+        super().__init__(coordinator, "clock_switch", screen=True)
 
     async def _async_set(self, on: bool) -> None:
         await themes.async_set_theme(self.coordinator, clock_on=on)
@@ -138,7 +138,7 @@ class TimeDisplaySwitch(ReportedSwitch):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, TIME_DISPLAY_STATE)
+        super().__init__(coordinator, TIME_DISPLAY_STATE, screen=True)
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
@@ -154,7 +154,7 @@ class HolidaySwitch(ReportedSwitch):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "holiday_switch")
+        super().__init__(coordinator, "holiday_switch", screen=True)
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
@@ -212,18 +212,18 @@ class FastUpdatesSwitch(PrimeChargerEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return whether fast updates are on."""
-        return self.coordinator.fast_updates
+        return self.coordinator.fast_updates.on
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """When fast updates stop by themselves."""
-        until = self.coordinator.fast_updates_until
+        until = self.coordinator.fast_updates.until
         return {"until": until.isoformat() if until else None}
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Start fast updates."""
-        await self.coordinator.async_set_fast_updates(True)
+        await self.coordinator.fast_updates.async_set(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop fast updates."""
-        await self.coordinator.async_set_fast_updates(False)
+        await self.coordinator.fast_updates.async_set(False)

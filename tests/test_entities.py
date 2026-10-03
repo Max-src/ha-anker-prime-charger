@@ -19,7 +19,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import SN, FakeCloud
-from .helpers import attr, entity_id, state
+from .helpers import attr, device_id, entity_id, state
 
 
 async def test_device_info(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
@@ -193,6 +193,70 @@ async def test_port_devices(hass: HomeAssistant, setup_entry: MockConfigEntry) -
         attr(hass, "sensor", "usba_2_power", "friendly_name")
         == "250W Prime Charger USB-A A2 power"
     )
+
+
+async def test_screen_device(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
+    """The display, clock screensaver, knob and animations are on a Screen device."""
+    registry = er.async_get(hass)
+    screen = dr.async_get(hass).async_get(device_id(hass, "screen"))
+    assert screen.name == "250W Prime Charger Screen"
+    assert screen.parent_device_id == device_id(hass)
+
+    def device_of(platform: str, key: str) -> str:
+        return registry.async_get(entity_id(hass, platform, key)).device_id
+
+    for platform, key in (
+        ("number", "display_brightness"),
+        ("select", "display_timeout_mode"),
+        ("select", "knob_mode"),
+        ("select", "clock_mode"),
+        ("select", "theme_id"),
+        ("select", "clock_display_weekdays_preset"),
+        ("switch", "clock_switch"),
+        ("switch", "time_display"),
+        ("switch", "holiday_switch"),
+        ("text", "clock_display_weekdays"),
+        ("time", "clock_display_start"),
+        ("time", "clock_display_end"),
+        ("event", "hidden_animation"),
+        ("sensor", "unlocked_animations"),
+    ):
+        assert device_of(platform, key) == screen.id, key
+    # the rest stays on the charger
+    for platform, key in (("sensor", "total_output_power"), ("select", "usage_mode")):
+        assert device_of(platform, key) == device_id(hass), key
+
+    assert (
+        attr(hass, "number", "display_brightness", "friendly_name")
+        == "250W Prime Charger Screen Brightness"
+    )
+    assert (
+        attr(hass, "switch", "clock_switch", "friendly_name")
+        == "250W Prime Charger Screen Clock screensaver"
+    )
+
+
+async def test_screen_entities_move_to_the_screen_device(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """Existing display entities move to the Screen device, keeping their entity id."""
+    charger = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, SN)}
+    )
+    registry = er.async_get(hass)
+    old = registry.async_get_or_create(
+        "number",
+        DOMAIN,
+        f"{SN}_display_brightness",
+        config_entry=entry,
+        device_id=charger.id,
+        suggested_object_id="250w_prime_charger_display_brightness",
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    moved = registry.async_get(old.entity_id)
+    assert moved.entity_id == "number.250w_prime_charger_display_brightness"
+    assert moved.device_id == device_id(hass, "screen")
 
 
 async def test_port_devices_of_0_13_become_child_devices(

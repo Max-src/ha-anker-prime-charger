@@ -10,6 +10,7 @@
 | `__init__.py` | Setup and unload of a charger, actions registration, retired entities cleanup |
 | `config_flow.py` | Login (finds the account's country and server), options |
 | `coordinator.py` | MQTT connection, status polling, incoming messages (handed to the event loop; pushed without moving the poll schedule), commands, fast updates |
+| `fast_updates.py` | Fast updates: resend the real-time trigger every 8 s until the duration runs out |
 | `cloud.py` | Settings stored in the Anker cloud: background refresh, test features, port labels, profile requests |
 | `library.py` | **The only place that touches the vendored library's internals**: client creation, server override, raw cloud requests, the endpoint table |
 | `mqtt_extensions.py` | What we add to or correct in the library's description of the charger's messages |
@@ -17,10 +18,10 @@
 | `themes.py` | Clock themes: Standard Styles, theme list, current theme, theme command |
 | `custom_mode.py` | Custom charging mode settings: limits, protocols, checks, the `0206` command |
 | `profiles.py` | Custom profiles in the cloud: save, create, delete |
-| `schedules.py` | Port timers and schedules, clock display schedule, days presets; schedules are addressed as `(port, part)`, port `None` = clock display |
+| `schedules.py` | Port timers and schedules, clock screensaver schedule, days presets; schedules are addressed as `(port, part)`, port `None` = clock screensaver |
 | `services.py` | The actions (profiles, Set custom settings, Set days, Set protocols); they target devices: the charger or a port |
 | `helpers.py` | Value conversions (`to_number`, `to_int`, `is_on`, weekdays), `on_off`, `summed_power`, `translated` (errors with their message in `en.json` "exceptions") |
-| `entity.py` | Base entity: on the charger's device or a port's child device, unique id `<serial>_<unique_key or key>`; available once the key is reported (`_needs_key = False` for entities not bound to one value) |
+| `entity.py` | Base entity: on the charger's device, a port's child device or the Screen child device (`screen=True`), unique id `<serial>_<unique_key or key>`; available once the key is reported (`_needs_key = False` for entities not bound to one value) |
 | `presets.py` | Preset selects (days, protocols): common values for a list a text entity edits |
 | `binary_sensor.py` … `time.py` | One file per Home Assistant platform |
 | `solixapi/` | The vendored library, unchanged |
@@ -44,7 +45,10 @@ settings from `coordinator.cloud`. Changes go through `coordinator.async_send_co
   value set `_needs_key = False` and add their own conditions to `available`.
 - **Coordinator updates**: values pushed by the charger go through `_async_push` (keeps the poll
   schedule); `async_set_updated_data` would restart the poll interval.
-- **Schedules** are addressed as `(port key, part)`, port `None` for the clock display.
+- **Schedules** are addressed as `(port key, part)`, port `None` for the clock screensaver.
+- **Devices**: the charger, a child device per port (`<serial>_<port key>`), and the **Screen**
+  child device (`<serial>_screen`) for the display, clock screensaver, knob and hidden-animation
+  entities (`screen=True` on the entity). Actions resolve all three (`services.Target`).
 
 ## Tests
 
@@ -66,6 +70,12 @@ wsl -d Ubuntu -u root -- bash -c "cd '$repo' && /root/ha-test-venv/bin/python -m
 
 `tests/test_library_contract.py` lists what the integration relies on in the library; run it first
 after updating the library.
+
+CI (`.github/workflows/tests.yml`) runs the tests against three Home Assistant versions, each
+pinned by a `pytest-homeassistant-custom-component` release: **minimum** (the version in
+`hacs.json`) and **stable** (the latest release) must pass; **latest** (often a beta) is an early
+warning that may fail without blocking. It also runs weekly. When a new Home Assistant release is
+out, bump the *stable* pin, and the *minimum* one together with `hacs.json`.
 
 ## Lint and format
 

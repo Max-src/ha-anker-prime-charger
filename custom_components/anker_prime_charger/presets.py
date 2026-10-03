@@ -40,10 +40,16 @@ class PresetSelect(PrimeChargerEntity, SelectEntity, RestoreEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
-        self, coordinator: PrimeChargerCoordinator, key: str, port: Port | None
+        self,
+        coordinator: PrimeChargerCoordinator,
+        key: str,
+        port: Port | None,
+        screen: bool = False,
     ) -> None:
         """Initialize (key: the value's status key)."""
-        super().__init__(coordinator, key, port, unique_key=f"{key}_preset")
+        super().__init__(
+            coordinator, key, port, unique_key=f"{key}_preset", screen=screen
+        )
         # the value when "custom" was picked; shown as custom while unchanged
         self._custom: tuple[str, ...] | None = None
 
@@ -106,7 +112,10 @@ class WeekdaysPresetSelect(PresetSelect):
         self._port_key = port.key if port else None
         self._part = part
         super().__init__(
-            coordinator, schedules.weekdays_key(self._port_key, part), port
+            coordinator,
+            schedules.weekdays_key(self._port_key, part),
+            port,
+            screen=port is None,
         )
         self._attr_translation_key = (
             f"schedule_{part}_days_preset" if port else "clock_display_days_preset"

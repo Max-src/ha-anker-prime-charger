@@ -15,6 +15,11 @@ MODEL: Final = "A2345"
 MODEL_NAME: Final = "Prime Charger 250W"
 MANUFACTURER: Final = "Anker"
 
+# The charger's screen: a child device with the display, clock screensaver,
+# knob and hidden-animation entities (device identifier "<serial>_screen")
+SCREEN: Final = "screen"
+SCREEN_LABEL: Final = "Screen"
+
 CONF_COUNTRY: Final = "country"
 CONF_DEVICE_SN: Final = "device_sn"
 CONF_SERVER: Final = "server"

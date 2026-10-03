@@ -6,12 +6,16 @@ They target devices: the charger, or one of its ports (child devices).
   the custom-mode settings in one command, so the ports are cut and
   renegotiated once, see custom_mode.py).
 - Set days: the weekdays of a port schedule's start or end (target the port,
-  pick the schedule), or of the clock display (target the charger).
+  pick the schedule), or of the clock screensaver (target the Screen device;
+  the charger's device is accepted too).
 - Set protocols: the fast-charging protocols of a USB-C port in the custom
   mode (target the port).
 
 An entity of the integration may be targeted instead of a device: it stands
-for its device. The actions are registered when the integration loads (not
+for its device. Devices and entities named directly must suit the action (a
+clear error otherwise). Areas, floors and labels are resolved to the
+integration's devices in them, keeping those the action applies to (e.g. the
+charger for a profile action, its USB-C ports for Set protocols). The actions are registered when the integration loads (not
 when a charger is set up), so they always exist and say clearly when the
 target isn't usable.
 """
@@ -25,7 +29,13 @@ from typing import Any, Final
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
+from homeassistant.const import (
+    ATTR_AREA_ID,
+    ATTR_DEVICE_ID,
+    ATTR_ENTITY_ID,
+    ATTR_FLOOR_ID,
+    ATTR_LABEL_ID,
+)
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import (
@@ -33,9 +43,13 @@ from homeassistant.helpers import (
     device_registry as dr,
     entity_registry as er,
 )
+from homeassistant.helpers.target import (
+    TargetSelection,
+    async_extract_referenced_entity_ids,
+)
 
 from . import custom_mode, profiles, schedules
-from .const import DOMAIN
+from .const import DOMAIN, SCREEN
 from .coordinator import PrimeChargerCoordinator
 from .helpers import WEEKDAYS, translated
 from .ports import PORTS, Port
@@ -67,15 +81,34 @@ class Target:
 
     coordinator: PrimeChargerCoordinator
     port: Port | None
+    # the charger's Screen device (port None)
+    screen: bool = False
+
+
+type Handler = Callable[[ServiceCall, Target], Awaitable[None]]
+# Whether an action applies to a device found through an area, floor or label
+type Applies = Callable[[ServiceCall, Target], bool]
+
+
+def _is_charger(call: ServiceCall, target: Target) -> bool:
+    return target.port is None and not target.screen
+
+
+def _has_schedule_days(call: ServiceCall, target: Target) -> bool:
+    """A port's start or end days with "schedule", else the clock screensaver's."""
+    if "schedule" in call.data:
+        return target.port is not None
+    return target.screen
+
+
+def _is_usb_c_port(call: ServiceCall, target: Target) -> bool:
+    return target.port is not None and target.port.is_usb_c
 
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register the actions."""
-    actions: tuple[
-        tuple[str, dict[Any, Any], Callable[[ServiceCall, Target], Awaitable[None]]],
-        ...,
-    ] = (
+    actions: tuple[tuple[str, dict[Any, Any], Handler, Applies], ...] = (
         (
             SERVICE_SAVE_PROFILE,
             {
@@ -85,18 +118,26 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 **SETTINGS_FIELDS,
             },
             _async_save_profile,
+            _is_charger,
         ),
         (
             SERVICE_CREATE_PROFILE,
             {vol.Required("name"): cv.string, **SETTINGS_FIELDS},
             _async_create_profile,
+            _is_charger,
         ),
         (
             SERVICE_DELETE_PROFILE,
             {vol.Required("profile"): cv.string},
             _async_delete_profile,
+            _is_charger,
         ),
-        (SERVICE_SET_CUSTOM_SETTINGS, SETTINGS_FIELDS, _async_set_custom_settings),
+        (
+            SERVICE_SET_CUSTOM_SETTINGS,
+            SETTINGS_FIELDS,
+            _async_set_custom_settings,
+            _is_charger,
+        ),
         (
             SERVICE_SET_DAYS,
             {
@@ -107,6 +148,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 vol.Optional("schedule"): vol.In(schedules.SCHEDULE_PARTS),
             },
             _async_set_days,
+            _has_schedule_days,
         ),
         (
             SERVICE_SET_PROTOCOLS,
@@ -117,22 +159,29 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 )
             },
             _async_set_protocols,
+            _is_usb_c_port,
         ),
     )
-    for name, fields, func in actions:
+    for name, fields, func, applies in actions:
         hass.services.async_register(
             DOMAIN,
             name,
-            _for_each_target(hass, func),
+            _for_each_target(hass, func, applies),
             schema=cv.make_entity_service_schema(fields),
         )
 
 
 def _for_each_target(
-    hass: HomeAssistant, func: Callable[[ServiceCall, Target], Awaitable[None]]
+    hass: HomeAssistant, func: Handler, applies: Applies
 ) -> Callable[[ServiceCall], Awaitable[None]]:
     async def handle(call: ServiceCall) -> None:
-        if not (targets := _targets(hass, call)):
+        named = _resolve(hass, _named_devices(hass, call))
+        found = [
+            target
+            for target in _resolve(hass, _devices_in_groups(hass, call))
+            if target not in named and applies(call, target)
+        ]
+        if not (targets := named + found):
             raise translated(ServiceValidationError, "no_target")
         for target in targets:
             await func(call, target)
@@ -140,15 +189,43 @@ def _for_each_target(
     return handle
 
 
-def _targets(hass: HomeAssistant, call: ServiceCall) -> list[Target]:
-    """The integration's devices the call targets (entities count as their device)."""
-    entity_registry = er.async_get(hass)
-    device_registry = dr.async_get(hass)
-    device_ids = set(cv.ensure_list(call.data.get(ATTR_DEVICE_ID)))
+def _device_of(hass: HomeAssistant, entity_id: str) -> str | None:
+    """The device of one of the integration's entities."""
+    entry = er.async_get(hass).async_get(entity_id)
+    return entry.device_id if entry and entry.platform == DOMAIN else None
+
+
+def _named_devices(hass: HomeAssistant, call: ServiceCall) -> set[str]:
+    """Devices targeted by id, or through one of their entities."""
+    devices = set(cv.ensure_list(call.data.get(ATTR_DEVICE_ID)))
     for entity_id in cv.ensure_list(call.data.get(ATTR_ENTITY_ID)):
-        entry = entity_registry.async_get(entity_id)
-        if entry and entry.platform == DOMAIN and entry.device_id:
-            device_ids.add(entry.device_id)
+        if device_id := _device_of(hass, entity_id):
+            devices.add(device_id)
+    return devices
+
+
+def _devices_in_groups(hass: HomeAssistant, call: ServiceCall) -> set[str]:
+    """Devices in the targeted areas, floors and labels (or with entities in them)."""
+    groups = {
+        key: call.data[key]
+        for key in (ATTR_AREA_ID, ATTR_FLOOR_ID, ATTR_LABEL_ID)
+        if key in call.data
+    }
+    if not groups:
+        return set()
+    selected = async_extract_referenced_entity_ids(
+        hass, TargetSelection(groups), expand_group=False
+    )
+    devices = set(selected.referenced_devices)
+    for entity_id in selected.referenced | selected.indirectly_referenced:
+        if device_id := _device_of(hass, entity_id):
+            devices.add(device_id)
+    return devices
+
+
+def _resolve(hass: HomeAssistant, device_ids: set[str]) -> list[Target]:
+    """The integration's chargers and ports among these devices."""
+    device_registry = dr.async_get(hass)
     # Device identifiers of the loaded chargers and their ports (the port
     # devices are child devices: matched by identifier, not config entry)
     known: dict[str, Target] = {}
@@ -157,6 +234,7 @@ def _targets(hass: HomeAssistant, call: ServiceCall) -> list[Target]:
             coordinator = entry.runtime_data
             sn = coordinator.device_sn
             known[sn] = Target(coordinator, None)
+            known[f"{sn}_{SCREEN}"] = Target(coordinator, None, screen=True)
             known |= {f"{sn}_{port.key}": Target(coordinator, port) for port in PORTS}
     targets: dict[str, Target] = {}
     for device_id in device_ids:
@@ -173,7 +251,7 @@ def _targets(hass: HomeAssistant, call: ServiceCall) -> list[Target]:
 
 def _charger(target: Target) -> PrimeChargerCoordinator:
     """The coordinator of a targeted charger (not a port)."""
-    if target.port is not None:
+    if target.port is not None or target.screen:
         raise translated(ServiceValidationError, "target_charger")
     return target.coordinator
 

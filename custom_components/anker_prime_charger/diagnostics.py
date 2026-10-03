@@ -55,7 +55,7 @@ async def async_get_config_entry_diagnostics(
             "update_interval": str(coordinator.update_interval),
             "last_message": _iso(coordinator.last_message),
             "stale_after": str(coordinator.stale_after),
-            "fast_updates_until": _iso(coordinator.fast_updates_until),
+            "fast_updates_until": _iso(coordinator.fast_updates.until),
         },
         "cloud": {
             "last_refresh": _iso(cloud.refreshed),

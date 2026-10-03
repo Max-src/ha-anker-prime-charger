@@ -206,6 +206,41 @@ async def test_reauth_charger_missing(
     assert entry.data[CONF_PASSWORD] == PASSWORD
 
 
+async def test_reconfigure(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """Reconfigure changes the login, keeping the charger; another account is refused."""
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "reconfigure"
+
+    cloud.auth_error = errors.InvalidCredentialsError("bad")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_EMAIL: EMAIL, CONF_PASSWORD: "wrong"}
+    )
+    assert result["errors"] == {"base": "invalid_auth"}
+
+    cloud.auth_error = None
+    cloud.devices = [{**DEVICE, "device_sn": "SOMEONE_ELSE"}]
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_EMAIL: "other@example.com", CONF_PASSWORD: "x"}
+    )
+    assert result["errors"] == {"base": "charger_not_in_account"}
+
+    cloud.devices = [DEVICE]
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_EMAIL: "new@example.com", CONF_PASSWORD: "new-password"},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_EMAIL] == "new@example.com"
+    assert entry.data[CONF_PASSWORD] == "new-password"
+    assert entry.data[CONF_DEVICE_SN] == SN
+
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_options_flow(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:
     """The status interval and fast updates duration apply after reload."""
     result = await hass.config_entries.options.async_init(setup_entry.entry_id)

@@ -20,8 +20,8 @@ Developed for my Anker Prime Charger (250W, 6 Ports, GaNPrime - model A2345). Wi
 | Charging modes       | Select AI power, Connection priority, Dual laptop, Low power or a saved custom profile         |
 | Custom charging      | Set power limits and allowed fast-charging protocols, and manage up to four profiles           |
 | Timers and schedules | Stop charging after a countdown or set repeating weekly on/off schedules                       |
-| Clock and display    | Choose themes, schedule the clock screen, and adjust brightness, timeout and clock format      |
-| Extra settings       | Access the app's test features, holiday clock updates and hidden-animation events              |
+| Screen and clock     | On its own Screen device: themes, clock screensaver schedule, brightness, timeout, clock format |
+| Extra settings       | Access the app's test features, holiday screensaver and hidden-animation events                |
 
 This integration communicates through the **Anker cloud**, not directly over your local network:
 the charger offers no local connection (none of its network ports accept connections). Both Home
@@ -97,6 +97,9 @@ the integration for a normal update.
 The integration finds the account's region automatically. No country, server address, charger
 IP address or YAML configuration is needed.
 
+To change the Anker email or password later, open the integration and choose **Reconfigure**.
+The account must own the same charger; add the integration again for a different charger.
+
 If you also use the `anker_solix` integration with MQTT on the same Anker account, consider
 disabling its MQTT connection to avoid competing sessions.
 
@@ -109,8 +112,10 @@ You can add their entities to dashboards or use them in automations.
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charger-device.png" alt="The charger's device page in Home Assistant" width="700">
 -->
 
-The charger has five child devices: **USB-C 1**, **USB-C 2**, **USB-C 3**, **USB-C 4** and **USB-A**.
-The USB-A device contains separate **A1** and **A2** readings, energy sensors and labels, but
+The charger has six child devices: **USB-C 1**, **USB-C 2**, **USB-C 3**, **USB-C 4**, **USB-A**
+and **Screen**. The Screen device holds the display settings, the clock screensaver and the
+hidden animations, named as in the charger's *Settings* menu. The USB-A device contains
+separate **A1** and **A2** readings, energy sensors and labels, but
 its on/off switch, timer, schedule and custom power limit control **both USB-A ports together**.
 
 <!-- SCREENSHOT: add images/screenshot-port-device.png, then remove these comment markers
@@ -129,12 +134,20 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Priority ports | The one or two USB-C ports favoured in Connection priority mode |
 | Automatic deactivation | Custom mode: leave it when a port set to 0 W is used |
 | Maximum compatibility, Custom charging mode, Charging device identification | The app's test features |
-| Clock theme, Clock display, Time display, Holiday updates | The clock screen: theme, on/off, time over custom images, festive screens |
-| Clock display start / end / days (+ days preset) | When the clock screen is shown |
-| Display brightness, Display timeout, Knob direction, Clock format | As in the app |
 | Fast updates | Readings every second for a while (see the options) |
 | Refresh | Ask for the status now and re-read the cloud settings |
-| Hidden animation, Unlocked animations | Event when the charger plays a hidden animation; how many are unlocked |
+
+**Screen**
+
+| Entity | What it does |
+| --- | --- |
+| Brightness, Timeout, Knob orientation, Clock format | As in the charger's *Settings* menu (Timeout: *Always on*, 30 seconds ... 30 minutes) |
+| Clock screensaver | Show the clock when the screen times out |
+| Clock screensaver start / end / days (+ days preset) | When the clock screensaver may be shown |
+| Clock theme | Standard Style 1-3, Anker's stock themes and your own images (`Custom - <name>`) |
+| Time display | The time over a custom image (stock themes always show it) |
+| Holiday screensaver | Festive themes on holidays, chosen by the charger (the guide's *Holiday Update*) |
+| Hidden animation, Unlocked animations | Event when the screen plays a hidden animation; how many are unlocked |
 
 **Each port** (USB-C 1-4, and USB-A for both USB-A ports)
 
@@ -278,21 +291,27 @@ pick what it supports.
 - **Days preset:** choose Every day, Weekdays, Weekends or None. For another combination, edit
   the days entity or use **Set days**; the preset then shows Custom.
 
-### Clock and display
+### Screen and clock
+
+<!-- SCREENSHOT: add images/screenshot-screen-device.png, then remove these comment markers
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-screen-device.png" alt="The charger's Screen device page in Home Assistant" width="700">
+-->
 
 <!-- SCREENSHOT: add images/screenshot-clock-theme.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-clock-theme.png" alt="Choosing a clock theme" width="700">
 -->
 
-Choose a **Clock theme**, enable **Clock display**, and optionally set its start time, end time
-and days. Brightness, display timeout, knob direction and 12/24-hour format are also available.
+Everything about the charger's screen is on its **Screen** device. Choose a **Clock theme**,
+turn on **Clock screensaver**, and optionally set its start time, end time and days.
+**Brightness**, **Timeout**, **Knob orientation** and **Clock format** (12/24-hour) are there
+too.
 
-To show the clock, the charger's clock screensaver must be selected, the display timeout must
-not be **Never**, and the screen must not have been turned off using the knob.
+The clock screensaver shows when the screen times out, so **Timeout** must not be **Always on**,
+and the screen must not have been turned off using the knob.
 
 Upload personal clock images through the Anker app first; they appear as `Custom - <name>` in
 **Clock theme** after a refresh. **Time display** controls the time overlay on custom images;
-stock themes always show it. **Holiday updates** enables festive screens chosen by the charger.
+stock themes always show it. **Holiday screensaver** shows festive themes chosen by the charger.
 
 ## Automations
 
@@ -305,11 +324,13 @@ or selector. Extra actions are available under **Developer tools > Actions** and
 | `anker_prime_charger.create_custom_profile` | The charger                   | Save the current settings as a new named profile |
 | `anker_prime_charger.save_custom_profile`   | The charger                   | Edit or rename an existing profile               |
 | `anker_prime_charger.delete_custom_profile` | The charger                   | Delete a named profile                           |
-| `anker_prime_charger.set_days`              | A port, or the charger        | Choose a schedule's days with a day picker       |
+| `anker_prime_charger.set_days`              | A port, or the Screen         | Choose a schedule's days with a day picker       |
 | `anker_prime_charger.set_protocols`         | A USB-C port                  | Choose allowed protocols with a picker           |
 
 Actions target **devices**: the charger, or one of its port devices. In the action editor, pick
-the device from the list; several ports can be targeted at once. Saving a profile does **not**
+the device from the list; several ports can be targeted at once. An **area** or **label** works
+too: the action applies to the devices in it that it suits (e.g. a profile action to the charger,
+**Set protocols** to its USB-C ports). Port devices follow the charger's area. Saving a profile does **not**
 apply it. Select the profile in **Charging mode** to activate it.
 
 <!-- SCREENSHOT: add images/screenshot-set-custom-settings.png, then remove these comment markers
@@ -386,12 +407,12 @@ data:
   days: [mon, wed, fri]
 ```
 
-Target the charger instead for the days the clock screen is shown (no `schedule` needed):
+Target the Screen device instead for the clock screensaver's days (no `schedule` needed):
 
 ```yaml
 action: anker_prime_charger.set_days
 target:
-  device_id: <the charger's device id>
+  device_id: <the Screen device's id>
 data:
   days: [sat, sun]
 ```
@@ -440,7 +461,7 @@ for hardware limits and charging-mode details.
 | Custom profiles are missing                           | Enable the **Custom charging mode** test feature and check for firmware updates                                        |
 | Charging briefly stops after changing custom settings | The charger reapplies settings on all ports. Use **Set custom settings** for a combined change                         |
 | USB-A ports switch together                           | This is a charger limitation; their power and energy readings are still separate                                       |
-| Clock screen is not shown                             | Check **Clock display**, its schedule, the screensaver selection and display timeout                                   |
+| Clock screen is not shown                             | On the Screen device: check **Clock screensaver**, its schedule, and that **Timeout** is not *Always on*              |
 | A port does not reach its maximum power               | Check the charging mode, cable and device capabilities. Only USB-C 1 supports 140 W; charging slows as batteries fill  |
 
 Renaming the charger is supported in Home Assistant only. Uploading clock images still requires

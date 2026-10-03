@@ -82,7 +82,10 @@ class WeekdaysText(PrimeChargerEntity, TextEntity):
     ) -> None:
         """Initialize."""
         super().__init__(
-            coordinator, schedules.weekdays_key(port.key if port else None, part), port
+            coordinator,
+            schedules.weekdays_key(port.key if port else None, part),
+            port,
+            screen=port is None,
         )
         self._part = part
         self._attr_translation_key = (

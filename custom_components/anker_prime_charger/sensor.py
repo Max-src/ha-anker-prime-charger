@@ -259,7 +259,7 @@ class UnlockedAnimations(PrimeChargerEntity, SensorEntity):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "unlocked_animations")
+        super().__init__(coordinator, "unlocked_animations", screen=True)
 
     @property
     def available(self) -> bool:

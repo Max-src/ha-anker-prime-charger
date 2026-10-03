@@ -45,7 +45,7 @@ class DisplayBrightness(PrimeChargerEntity, NumberEntity):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, "display_brightness")
+        super().__init__(coordinator, "display_brightness", screen=True)
 
     @property
     def native_value(self) -> int | None:

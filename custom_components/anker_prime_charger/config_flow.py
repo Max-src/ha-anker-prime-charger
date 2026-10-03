@@ -155,6 +155,52 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors_,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the Anker login (email, password) of a configured charger.
+
+        The account must own the same charger; a different charger is added as
+        a new entry instead.
+        """
+        entry = self._get_reconfigure_entry()
+        errors_: dict[str, str] = {}
+        if user_input is not None:
+            data = {
+                **entry.data,
+                CONF_EMAIL: user_input[CONF_EMAIL],
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            chargers, error = await self._async_validate(data)
+            if (
+                error in (None, "no_devices")
+                and entry.data[CONF_DEVICE_SN] not in chargers
+            ):
+                error = "charger_not_in_account"
+            if error:
+                errors_["base"] = error
+            else:
+                return self.async_update_reload_and_abort(entry, data=data)
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(
+                    {
+                        vol.Required(CONF_EMAIL): TextSelector(
+                            TextSelectorConfig(type=TextSelectorType.EMAIL)
+                        ),
+                        vol.Required(CONF_PASSWORD): TextSelector(
+                            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                        ),
+                    }
+                ),
+                {CONF_EMAIL: (user_input or entry.data)[CONF_EMAIL]},
+            ),
+            description_placeholders={"serial": entry.data[CONF_DEVICE_SN]},
+            errors=errors_,
+        )
+
     async def _async_create(self, device_sn: str) -> ConfigFlowResult:
         await self.async_set_unique_id(device_sn)
         self._abort_if_unique_id_configured()
