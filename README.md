@@ -116,7 +116,7 @@ hidden animations, named as in the charger's _Settings_ menu. The USB-A device c
 separate **A1** and **A2** readings, energy sensors and labels, but
 its on/off switch, timer, schedule and custom power limit control **both USB-A ports together**.
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-port-device.png" alt="A USB-C port's device page in Home Assistant" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-port-device.png" alt="A USB-C port's device page in Home Assistant">
 
 <details>
 <summary>All entities</summary>
@@ -205,7 +205,7 @@ estimate but do not make it a calibrated energy measurement.
 
 Choose a mode using **Charging mode**:
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charging-mode.png" alt="The Charging mode list with custom profiles" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charging-mode.png" alt="The Charging mode list with custom profiles">
 
 | Mode                | Use it for                                                        |
 | ------------------- | ----------------------------------------------------------------- |
@@ -285,9 +285,9 @@ pick what it supports.
 
 ### Screen and clock
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-screen-device.png" alt="The charger's Screen device page in Home Assistant" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-screen-device.png" alt="The charger's Screen device page in Home Assistant">
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-clock-theme.png" alt="Choosing a clock theme" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-clock-theme.png" alt="Choosing a clock theme">
 
 Everything about the charger's screen is on its **Screen** device. Choose a **Clock theme**,
 turn on **Clock screensaver**, and optionally set its start time, end time and days.
