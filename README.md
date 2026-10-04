@@ -13,15 +13,15 @@ Developed for my Anker Prime Charger (250W, 6 Ports, GaNPrime - model A2345). Wi
 
 ## Features
 
-|                      | What you can do                                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| Power and energy     | View power, voltage, current and estimated energy for every physical port, plus charger totals |
-| Port controls        | Turn charging on or off, change port labels, and check whether a device is connected           |
-| Charging modes       | Select AI power, Connection priority, Dual laptop, Low power or a saved custom profile         |
-| Custom charging      | Set power limits and allowed fast-charging protocols, and manage up to four profiles           |
-| Timers and schedules | Stop charging after a countdown or set repeating weekly on/off schedules                       |
+|                      | What you can do                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| Power and energy     | View power, voltage, current and estimated energy for every physical port, plus charger totals  |
+| Port controls        | Turn charging on or off, change port labels, and check whether a device is connected            |
+| Charging modes       | Select AI power, Connection priority, Dual laptop, Low power or a saved custom profile          |
+| Custom charging      | Set power limits and allowed fast-charging protocols, and manage up to four profiles            |
+| Timers and schedules | Stop charging after a countdown or set repeating weekly on/off schedules                        |
 | Screen and clock     | On its own Screen device: themes, clock screensaver schedule, brightness, timeout, clock format |
-| Extra settings       | Access the app's test features, holiday screensaver and hidden-animation events                |
+| Extra settings       | Access the app's test features, holiday screensaver and hidden-animation events                 |
 
 This integration communicates through the **Anker cloud**, not directly over your local network:
 the charger offers no local connection (none of its network ports accept connections). Both Home
@@ -108,60 +108,56 @@ disabling its MQTT connection to avoid competing sessions.
 Open the integration under **Settings > Devices & services** to find your charger and its ports.
 You can add their entities to dashboards or use them in automations.
 
-<!-- SCREENSHOT: add images/screenshot-charger-device.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charger-device.png" alt="The charger's device page in Home Assistant" width="700">
--->
 
 The charger has six child devices: **USB-C 1**, **USB-C 2**, **USB-C 3**, **USB-C 4**, **USB-A**
 and **Screen**. The Screen device holds the display settings, the clock screensaver and the
-hidden animations, named as in the charger's *Settings* menu. The USB-A device contains
+hidden animations, named as in the charger's _Settings_ menu. The USB-A device contains
 separate **A1** and **A2** readings, energy sensors and labels, but
 its on/off switch, timer, schedule and custom power limit control **both USB-A ports together**.
 
-<!-- SCREENSHOT: add images/screenshot-port-device.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-port-device.png" alt="A USB-C port's device page in Home Assistant" width="700">
--->
 
 <details>
 <summary>All entities</summary>
 
 **Charger**
 
-| Entity | What it does |
-| --- | --- |
-| Total output power, Total output energy | Sum of all ports (W), and the energy delivered (kWh) for the Energy dashboard |
-| Charging mode | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile |
-| Priority ports | The one or two USB-C ports favoured in Connection priority mode |
-| Automatic deactivation | Custom mode: leave it when a port set to 0 W is used |
-| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features |
-| Fast updates | Readings every second for a while (see the options) |
-| Refresh | Ask for the status now and re-read the cloud settings |
+| Entity                                                                      | What it does                                                                                  |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Total output power, Total output energy                                     | Sum of all ports (W), and the energy delivered (kWh) for the Energy dashboard                 |
+| Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile |
+| Priority ports                                                              | The one or two USB-C ports favoured in Connection priority mode                               |
+| Automatic deactivation                                                      | Custom mode: leave it when a port set to 0 W is used                                          |
+| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features                                                                       |
+| Fast updates                                                                | Readings every second for a while (see the options)                                           |
+| Refresh                                                                     | Ask for the status now and re-read the cloud settings                                         |
 
 **Screen**
 
-| Entity | What it does |
-| --- | --- |
-| Brightness, Timeout, Knob orientation, Clock format | As in the charger's *Settings* menu (Timeout: *Always on*, 30 seconds ... 30 minutes) |
-| Clock screensaver | Show the clock when the screen times out |
-| Clock screensaver start / end / days (+ days preset) | When the clock screensaver may be shown |
-| Clock theme | Standard Style 1-3, Anker's stock themes and your own images (`Custom - <name>`) |
-| Time display | The time over a custom image (stock themes always show it) |
-| Holiday screensaver | Festive themes on holidays, chosen by the charger (the guide's *Holiday Update*) |
-| Hidden animation, Unlocked animations | Event when the screen plays a hidden animation; how many are unlocked |
+| Entity                                               | What it does                                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Brightness, Timeout, Knob orientation, Clock format  | As in the charger's _Settings_ menu (Timeout: _Always on_, 30 seconds ... 30 minutes) |
+| Clock screensaver                                    | Show the clock when the screen times out                                              |
+| Clock screensaver start / end / days (+ days preset) | When the clock screensaver may be shown                                               |
+| Clock theme                                          | Standard Style 1-3, Anker's stock themes and your own images (`Custom - <name>`)      |
+| Time display                                         | The time over a custom image (stock themes always show it)                            |
+| Holiday screensaver                                  | Festive themes on holidays, chosen by the charger (the guide's _Holiday Update_)      |
+| Hidden animation, Unlocked animations                | Event when the screen plays a hidden animation; how many are unlocked                 |
 
 **Each port** (USB-C 1-4, and USB-A for both USB-A ports)
 
-| Entity | What it does |
-| --- | --- |
-| *(the port itself)* | Charging on or off |
-| Power, Voltage, Current | Live readings. Power has the port's maximum as attribute `max_power` (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W) |
-| Energy | Energy delivered (kWh), for the Energy dashboard |
-| Connected | On while a device is plugged in |
-| Label | The port's name in the Anker app |
-| Custom power limit | The port's limit in custom mode |
-| Custom protocols (+ preset) | USB-C: optional fast-charging protocols allowed in custom mode (attribute `allowed`: what the port's power permits) |
-| Timer, Timer duration, Timer end | One-off countdown that turns the port off |
-| Schedule start / end, with time, days and days preset | Weekly on and off times |
+| Entity                                                | What it does                                                                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| _(the port itself)_                                   | Charging on or off                                                                                                       |
+| Power, Voltage, Current                               | Live readings. Power has the port's maximum as attribute `max_power` (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W) |
+| Energy                                                | Energy delivered (kWh), for the Energy dashboard                                                                         |
+| Connected                                             | On while a device is plugged in                                                                                          |
+| Label                                                 | The port's name in the Anker app                                                                                         |
+| Custom power limit                                    | The port's limit in custom mode                                                                                          |
+| Custom protocols (+ preset)                           | USB-C: optional fast-charging protocols allowed in custom mode (attribute `allowed`: what the port's power permits)      |
+| Timer, Timer duration, Timer end                      | One-off countdown that turns the port off                                                                                |
+| Schedule start / end, with time, days and days preset | Weekly on and off times                                                                                                  |
 
 On the USB-A device, readings, energy and labels exist for **A1** and **A2** separately.
 
@@ -197,9 +193,7 @@ to track USB-C 1-4 and USB-A 1-2 separately.
 
 Allow time for Home Assistant to collect hourly statistics before expecting dashboard data.
 
-<!-- SCREENSHOT: add images/screenshot-energy-dashboard.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-energy-dashboard.png" alt="Charger ports in the Energy dashboard" width="700">
--->
 
 **These are estimates of energy delivered to devices, not electricity drawn from the wall.**
 They exclude conversion losses and standby consumption. Totals start at zero and are retained
@@ -211,9 +205,7 @@ estimate but do not make it a calibrated energy measurement.
 
 Choose a mode using **Charging mode**:
 
-<!-- SCREENSHOT: add images/screenshot-charging-mode.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charging-mode.png" alt="The Charging mode list with custom profiles" width="700">
--->
 
 | Mode                | Use it for                                                        |
 | ------------------- | ----------------------------------------------------------------- |
@@ -242,13 +234,13 @@ From [Anker's user guide](https://support.anker.com/s/article/Anker-Prime-Charge
 Every mode keeps to the port maximums (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W, both
 USB-A together 24 W when other ports are busy) and to 250 W in total (240 W with two ports in use).
 
-| Mode | Power per port |
-| --- | --- |
-| AI power | Adjusted to what each device needs (high, medium or low) |
+| Mode                | Power per port                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AI power            | Adjusted to what each device needs (high, medium or low)                                                                                                     |
 | Connection priority | The priority ports get the most. Example with all six ports in use: 70 W and 65 W for the two priority ports, 45 W for the other USB-C ports, 24 W for USB-A |
-| Dual laptop | With one or two ports in use, like Connection priority. With three or more: fixed 100 W on USB-C 1 and 2, 20 W on USB-C 3, 15 W on USB-C 4, 15 W on USB-A |
-| Low power | Fixed 65 W on USB-C 1, 20 W on USB-C 2-4, 15 W on USB-A (140 W in total) |
-| Custom | Your own limit per port: USB-C 0 W or 15 W up to its maximum, USB-A 0, 15 or 24 W |
+| Dual laptop         | With one or two ports in use, like Connection priority. With three or more: fixed 100 W on USB-C 1 and 2, 20 W on USB-C 3, 15 W on USB-C 4, 15 W on USB-A    |
+| Low power           | Fixed 65 W on USB-C 1, 20 W on USB-C 2-4, 15 W on USB-A (140 W in total)                                                                                     |
+| Custom              | Your own limit per port: USB-C 0 W or 15 W up to its maximum, USB-A 0, 15 or 24 W                                                                            |
 
 These are upper limits: a device only draws what it needs, and less as its battery fills.
 
@@ -261,17 +253,17 @@ In custom mode each USB-C port can allow or block these optional protocols. Stan
 Delivery (5, 9, 15, 20 V, and 28 V on USB-C 1) always stays available, so blocking a protocol
 never stops charging: the device falls back to standard USB PD, which can be slower for it.
 
-| Protocol | What it is | Typical devices | Needs at least |
-| --- | --- | --- | --- |
-| UFCS (`ufcs`) | Universal Fast Charging Specification, a fast-charging standard shared by several phone makers | Recent Huawei, Honor, Oppo, Vivo, Xiaomi phones | 15 W |
-| 5-11V PPS (`pps11v`) | USB PD *Programmable Power Supply*: the device asks for exactly the voltage it wants, which charges faster and cooler | Samsung *Super Fast Charging*, Google Pixel, most recent Android phones | 21 W |
-| PD 12V (`pd12v`) | An optional fixed 12 V step of USB PD | A few tablets and accessories | 21 W |
-| SCP (`scp`) | Huawei *SuperCharge Protocol* | Huawei and Honor phones | 23 W |
-| 5-16V PPS (`pps16v`) | PPS up to 16 V | Devices using PPS at higher power, e.g. some tablets | 45 W |
-| 4.5-21V PPS (`pps20v`) | PPS over its widest range, up to 21 V | Some laptops and the fastest-charging PPS phones | 45 W |
-| Xiaomi HyperCharge (`xiaomi`) | Xiaomi's own fast charging | Xiaomi, Redmi and Poco phones | 45 W |
+| Protocol                      | What it is                                                                                                            | Typical devices                                                         | Needs at least |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------- |
+| UFCS (`ufcs`)                 | Universal Fast Charging Specification, a fast-charging standard shared by several phone makers                        | Recent Huawei, Honor, Oppo, Vivo, Xiaomi phones                         | 15 W           |
+| 5-11V PPS (`pps11v`)          | USB PD _Programmable Power Supply_: the device asks for exactly the voltage it wants, which charges faster and cooler | Samsung _Super Fast Charging_, Google Pixel, most recent Android phones | 21 W           |
+| PD 12V (`pd12v`)              | An optional fixed 12 V step of USB PD                                                                                 | A few tablets and accessories                                           | 21 W           |
+| SCP (`scp`)                   | Huawei _SuperCharge Protocol_                                                                                         | Huawei and Honor phones                                                 | 23 W           |
+| 5-16V PPS (`pps16v`)          | PPS up to 16 V                                                                                                        | Devices using PPS at higher power, e.g. some tablets                    | 45 W           |
+| 4.5-21V PPS (`pps20v`)        | PPS over its widest range, up to 21 V                                                                                 | Some laptops and the fastest-charging PPS phones                        | 45 W           |
+| Xiaomi HyperCharge (`xiaomi`) | Xiaomi's own fast charging                                                                                            | Xiaomi, Redmi and Poco phones                                           | 45 W           |
 
-*Needs at least*: the port's custom power limit from which the charger allows it. The protocol
+_Needs at least_: the port's custom power limit from which the charger allows it. The protocol
 pickers also offer `huawei` (Huawei's high-power SuperCharge, known from other Anker chargers),
 but this charger never allows it; Huawei and Honor phones use SCP or UFCS here.
 
@@ -293,13 +285,9 @@ pick what it supports.
 
 ### Screen and clock
 
-<!-- SCREENSHOT: add images/screenshot-screen-device.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-screen-device.png" alt="The charger's Screen device page in Home Assistant" width="700">
--->
 
-<!-- SCREENSHOT: add images/screenshot-clock-theme.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-clock-theme.png" alt="Choosing a clock theme" width="700">
--->
 
 Everything about the charger's screen is on its **Screen** device. Choose a **Clock theme**,
 turn on **Clock screensaver**, and optionally set its start time, end time and days.
@@ -318,14 +306,14 @@ stock themes always show it. **Holiday screensaver** shows festive themes chosen
 Use the entities in Home Assistant's automation editor as you would any other switch, sensor
 or selector. Extra actions are available under **Developer tools > Actions** and in automations.
 
-| Action                                      | Target                        | Purpose                                          |
-| ------------------------------------------- | ----------------------------- | ------------------------------------------------ |
-| `anker_prime_charger.set_custom_settings`   | The charger                   | Apply several custom settings in one command     |
-| `anker_prime_charger.create_custom_profile` | The charger                   | Save the current settings as a new named profile |
-| `anker_prime_charger.save_custom_profile`   | The charger                   | Edit or rename an existing profile               |
-| `anker_prime_charger.delete_custom_profile` | The charger                   | Delete a named profile                           |
-| `anker_prime_charger.set_days`              | A port, or the Screen         | Choose a schedule's days with a day picker       |
-| `anker_prime_charger.set_protocols`         | A USB-C port                  | Choose allowed protocols with a picker           |
+| Action                                      | Target                | Purpose                                          |
+| ------------------------------------------- | --------------------- | ------------------------------------------------ |
+| `anker_prime_charger.set_custom_settings`   | The charger           | Apply several custom settings in one command     |
+| `anker_prime_charger.create_custom_profile` | The charger           | Save the current settings as a new named profile |
+| `anker_prime_charger.save_custom_profile`   | The charger           | Edit or rename an existing profile               |
+| `anker_prime_charger.delete_custom_profile` | The charger           | Delete a named profile                           |
+| `anker_prime_charger.set_days`              | A port, or the Screen | Choose a schedule's days with a day picker       |
+| `anker_prime_charger.set_protocols`         | A USB-C port          | Choose allowed protocols with a picker           |
 
 Actions target **devices**: the charger, or one of its port devices. In the action editor, pick
 the device from the list; several ports can be targeted at once. An **area** or **label** works
@@ -333,9 +321,7 @@ too: the action applies to the devices in it that it suits (e.g. a profile actio
 **Set protocols** to its USB-C ports). Port devices follow the charger's area. Saving a profile does **not**
 apply it. Select the profile in **Charging mode** to activate it.
 
-<!-- SCREENSHOT: add images/screenshot-set-custom-settings.png, then remove these comment markers
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-set-custom-settings.png" alt="The Set custom settings action in the action editor" width="700">
--->
 
 <details>
 <summary>Action examples and custom settings</summary>
@@ -434,13 +420,13 @@ data:
 Development and testing currently target the **Anker Prime Charger 250W, 6 ports (A2345)**.
 Only this model is offered during setup; the features above describe this charger.
 
-| Device                                               | Status                                                             |
-| ---------------------------------------------------- | ------------------------------------------------------------------ |
-| Anker Prime Charger 250W (A2345)                     | Supported and tested                                               |
-| Anker Prime Charging Station 240W 8-in-1 (A91B2)     | Not supported yet; a Wi-Fi model worth investigating with an owner |
-| Anker Prime Charger 160W (A2687)                     | Not supported; Bluetooth only                                      |
-| Anker Prime Wireless Charging Station 3-in-1 (A25X7) | Not supported; Bluetooth only                                      |
-| Anker 150W Charging Base for Prime power banks (A1903) | Not supported; nothing known about it yet                        |
+| Device                                                 | Status                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------ |
+| Anker Prime Charger 250W (A2345)                       | Supported and tested                                               |
+| Anker Prime Charging Station 240W 8-in-1 (A91B2)       | Not supported yet; a Wi-Fi model worth investigating with an owner |
+| Anker Prime Charger 160W (A2687)                       | Not supported; Bluetooth only                                      |
+| Anker Prime Wireless Charging Station 3-in-1 (A25X7)   | Not supported; Bluetooth only                                      |
+| Anker 150W Charging Base for Prime power banks (A1903) | Not supported; nothing known about it yet                          |
 
 Bluetooth-only devices cannot use this cloud integration. If you own an A91B2 and would like
 to help test it, [open an issue](https://github.com/Max-src/ha-anker-prime-charger/issues).
@@ -461,7 +447,7 @@ for hardware limits and charging-mode details.
 | Custom profiles are missing                           | Enable the **Custom charging mode** test feature and check for firmware updates                                        |
 | Charging briefly stops after changing custom settings | The charger reapplies settings on all ports. Use **Set custom settings** for a combined change                         |
 | USB-A ports switch together                           | This is a charger limitation; their power and energy readings are still separate                                       |
-| Clock screen is not shown                             | On the Screen device: check **Clock screensaver**, its schedule, and that **Timeout** is not *Always on*              |
+| Clock screen is not shown                             | On the Screen device: check **Clock screensaver**, its schedule, and that **Timeout** is not _Always on_               |
 | A port does not reach its maximum power               | Check the charging mode, cable and device capabilities. Only USB-C 1 supports 140 W; charging slows as batteries fill  |
 
 Renaming the charger is supported in Home Assistant only. Uploading clock images still requires
