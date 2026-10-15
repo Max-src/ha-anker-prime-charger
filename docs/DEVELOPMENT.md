@@ -49,6 +49,13 @@ settings from `coordinator.cloud`. Changes go through `coordinator.async_send_co
 - **Devices**: the charger, a child device per port (`<serial>_<port key>`), and the **Screen**
   child device (`<serial>_screen`) for the display, clock screensaver, knob and hidden-animation
   entities (`screen=True` on the entity). Actions resolve all three (`services.Target`).
+- **Entity id renames** (Home Assistant 2026.11+) update an entity in place instead of removing and
+  adding it again, so `async_added_to_hass` / `async_will_remove_from_hass` don't run on a rename.
+  Until 2027.11 an entity keeps the old behaviour unless every one of our classes that defines
+  `async_prepare_to_add_to_hass`, `async_added_to_hass` or `async_will_remove_from_hass` also
+  defines `async_entity_id_changed` (a `@callback` calling `super()`; a base class's hook doesn't
+  count). Add it to any new such class; `tests/test_entity_id_changes.py` fails otherwise. Never
+  key anything on an entity's own `entity_id`: use its unique id, or update the key in the hook.
 
 ## Tests
 

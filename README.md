@@ -111,7 +111,8 @@ You can add their entities to dashboards or use them in automations.
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charger-device.png" alt="The charger's device page in Home Assistant" width="700">
 
 The charger has six child devices: **USB-C 1**, **USB-C 2**, **USB-C 3**, **USB-C 4**, **USB-A**
-and **Screen**. The Screen device holds the display settings, the clock screensaver and the
+and **Screen**. Give the charger an area and leave the child devices' area empty: they follow
+the charger's. The Screen device holds the display settings, the clock screensaver and the
 hidden animations, named as in the charger's _Settings_ menu. The USB-A device contains
 separate **A1** and **A2** readings, energy sensors and labels, but
 its on/off switch, timer, schedule and custom power limit control **both USB-A ports together**.
@@ -318,7 +319,7 @@ or selector. Extra actions are available under **Developer tools > Actions** and
 Actions target **devices**: the charger, or one of its port devices. In the action editor, pick
 the device from the list; several ports can be targeted at once. An **area** or **label** works
 too: the action applies to the devices in it that it suits (e.g. a profile action to the charger,
-**Set protocols** to its USB-C ports). Port devices follow the charger's area. Saving a profile does **not**
+**Set protocols** to its USB-C ports). Set an area on the charger only: its port and Screen devices follow it as long as they have no area of their own (leave theirs empty). Labels are not inherited: label each device. Saving a profile does **not**
 apply it. Select the profile in **Charging mode** to activate it.
 
 <img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-set-custom-settings.png" alt="The Set custom settings action in the action editor" width="700">
