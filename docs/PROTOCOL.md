@@ -115,6 +115,24 @@ charger then re-applies power on all ports (connected devices briefly disconnect
 Clock images are baseline JPEGs of 480×200 pixels; the theme hash is the CRC32 of the file. The
 charger only shows images from Anker's storage (one served by Home Assistant was tried).
 
+## Other models on the account
+
+The account's device list (`get_bind_devices`) includes every device the app registered, also
+Bluetooth-only ones. The integration's diagnostics show them (`other_account_devices`). What
+the fields mean:
+
+- `wifi_online`: whether the device is connected to Anker's cloud. The A2345 reports `true`.
+- `mqtt_supported`: set by the library for any device the account owns; it does **not** mean
+  the device talks MQTT.
+
+**Prime Charger 160W (A2687)**, checked 2026-10-15 (firmware 1.6.1.0): `wifi_online` is
+`false`, and Anker describes it as connecting to the app over Bluetooth only. It never reaches
+the cloud, so the integration can't support it. The library has no message map for it either.
+Its Bluetooth protocol is decoded by [SolixBLE](https://github.com/flip-dots/SolixBLE) (used by
+the [HaSolixBLE](https://github.com/flip-dots/HaSolixBLE) integration): per-port status,
+voltage, current, power, on/off and timers, with the same `a1`, `a2`, … field layout as the
+cloud messages but AES-GCM encryption and a different handshake.
+
 ## Not found
 
 - **Local network access (2026-10-02):** the charger answers ping on the LAN, but a scan of all

@@ -12,6 +12,18 @@ from homeassistant.core import HomeAssistant
 from .const import CONF_DEVICE_SN
 from .coordinator import PrimeChargerConfigEntry
 
+# What is shown of the account's other devices: enough to tell a model and how
+# it connects (cloud MQTT or Bluetooth only), nothing that identifies it
+OTHER_DEVICE_FIELDS = (
+    "device_pn",
+    "type",
+    "sw_version",
+    "mqtt_supported",
+    "wireless_type",
+    "wifi_online",
+    "is_admin",
+)
+
 TO_REDACT = {
     CONF_EMAIL,
     CONF_PASSWORD,
@@ -74,6 +86,13 @@ async def async_get_config_entry_diagnostics(
             TO_REDACT,
         ),
         "mqtt_data": async_redact_data(dict(mqtt_data), TO_REDACT),
+        # Other devices on the Anker account (e.g. other chargers): helps add
+        # support for more models
+        "other_account_devices": [
+            {key: device.get(key) for key in OTHER_DEVICE_FIELDS}
+            for sn, device in coordinator.api.devices.items()
+            if sn != coordinator.device_sn
+        ],
     }
 
 

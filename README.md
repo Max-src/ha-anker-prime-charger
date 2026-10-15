@@ -425,12 +425,24 @@ Only this model is offered during setup; the features above describe this charge
 | ------------------------------------------------------ | ------------------------------------------------------------------ |
 | Anker Prime Charger 250W (A2345)                       | Supported and tested                                               |
 | Anker Prime Charging Station 240W 8-in-1 (A91B2)       | Not supported yet; a Wi-Fi model worth investigating with an owner |
-| Anker Prime Charger 160W (A2687)                       | Not supported; Bluetooth only                                      |
+| Anker Prime Charger 160W (A2687)                       | Not supported; Bluetooth only (tested: no Wi-Fi). See below        |
 | Anker Prime Wireless Charging Station 3-in-1 (A25X7)   | Not supported; Bluetooth only                                      |
 | Anker 150W Charging Base for Prime power banks (A1903) | Not supported; nothing known about it yet                          |
 
-Bluetooth-only devices cannot use this cloud integration. If you own an A91B2 and would like
-to help test it, [open an issue](https://github.com/Max-src/ha-anker-prime-charger/issues).
+Bluetooth-only devices cannot use this cloud integration: they appear in your Anker account,
+because the app registers them over Bluetooth, but they never connect to Anker's cloud. For
+the **Prime Charger 160W**, use the Bluetooth integration
+[HaSolixBLE](https://github.com/flip-dots/HaSolixBLE) (a HACS custom repository): it reads each
+port's power, voltage and current and can switch the ports and set their timers. The charger
+must be within Bluetooth range of Home Assistant (or of an ESPHome Bluetooth proxy), and the
+Anker app and Home Assistant can't be connected to it at the same time.
+
+Both chargers can run side by side: this integration for the 250W, HaSolixBLE for the 160W.
+
+If you own an A91B2 and would like to help test it,
+[open an issue](https://github.com/Max-src/ha-anker-prime-charger/issues). The integration's
+diagnostics list the other devices on your Anker account (model and how they connect, without
+names or serial numbers), which is the first thing needed to look at a new model.
 
 Some features require newer charger firmware. Keep it updated through the Anker app and consult
 [Anker's A2345 user guide](https://support.anker.com/s/article/Anker-Prime-Charger-250W-6-Ports-GaNPrime-User-Guide-A2345)
