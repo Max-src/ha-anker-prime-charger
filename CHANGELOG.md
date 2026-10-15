@@ -5,6 +5,8 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-15
+
 ### Added
 
 - Diagnostics list the other devices on your Anker account (model, firmware and how they
