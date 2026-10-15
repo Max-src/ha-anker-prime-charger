@@ -44,6 +44,14 @@ class HiddenAnimationEvent(PrimeChargerEntity, EventEntity):
         )
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Renamed in place (Home Assistant 2026.11+): nothing here uses the entity id.
+
+        Defining it opts in: the entity is no longer removed and added again.
+        """
+        super().async_entity_id_changed(old_entity_id)
+
+    @callback
     def _async_played(self, animation_type: int) -> None:
         self._trigger_event(EVENT_PLAYED, {"animation_type": animation_type})
         self.async_write_ha_state()

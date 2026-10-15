@@ -185,6 +185,17 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
             self._energy = to_number(last.native_value) or 0.0
         self._sample()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Renamed in place (Home Assistant 2026.11+): nothing here uses the entity id.
+
+        Without it, a rename would restart the energy sampling and lose the
+        energy since the last reading.
+
+        Defining it opts in: the entity is no longer removed and added again.
+        """
+        super().async_entity_id_changed(old_entity_id)
+
     def _power(self) -> float | None:
         """Summed power of the outputs (W), or nothing if none was reported."""
         return summed_power(self.coordinator.data or {}, self._outputs)

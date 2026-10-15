@@ -70,6 +70,14 @@ class PresetSelect(PrimeChargerEntity, SelectEntity, RestoreEntity):
         if (last := await self.async_get_last_state()) and last.state == CUSTOM:
             self._custom = self._value()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Renamed in place (Home Assistant 2026.11+): nothing here uses the entity id.
+
+        Defining it opts in: the entity is no longer removed and added again.
+        """
+        super().async_entity_id_changed(old_entity_id)
+
     @property
     def current_option(self) -> str | None:
         """Return the preset matching the value, else "custom"."""
