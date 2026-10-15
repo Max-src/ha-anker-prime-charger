@@ -152,11 +152,5 @@ library's login cache there. Restart Home Assistant afterwards. Both files are g
 
 ## Releasing
 
-1. Run the tests and `ruff check` / `ruff format --check` (CI runs them too, with hassfest and
-   the HACS check).
-2. Bump `version` in `manifest.json` ([semantic versioning](https://semver.org/): a new feature
-   bumps the minor version, a fix the patch).
-3. Commit, then tag the commit `v<version>` (e.g. `v0.16.0`) and push the tag.
-4. Create a GitHub release from the tag, with the changes in its notes. HACS offers users the
-   new release.
-5. If `hacs.json`'s minimum Home Assistant version changed, say so in the notes.
+See [RELEASING.md](RELEASING.md): bump the version, update `CHANGELOG.md`, tag, publish the
+release; a workflow then attaches `anker_prime_charger.zip`, which HACS installs from.
