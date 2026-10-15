@@ -1,0 +1,52 @@
+name: Release
+
+# Attaches anker_prime_charger.zip to every published release. HACS installs
+# from that asset (hacs.json zip_release) and shows its download count.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  zip:
+    name: Attach the HACS zip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      ZIP: anker_prime_charger.zip
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Build and check the zip
+        run: python3 scripts/release-zip.py --tag "$TAG"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # --clobber: re-running a failed run replaces a partial upload
+        run: gh release upload "$TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Check the uploaded asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          local_size=$(stat -c %s "$ZIP")
+          remote_size=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq ".assets[] | select(.name == \"$ZIP\") | .size")
+          if [ "$remote_size" != "$local_size" ]; then
+            echo "::error::$ZIP on $TAG is ${remote_size:-missing} bytes, expected $local_size"
+            echo "FAILED: $ZIP on $TAG is ${remote_size:-missing} bytes, expected $local_size" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Attached $ZIP to $TAG: $local_size bytes" >> "$GITHUB_STEP_SUMMARY"

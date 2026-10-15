@@ -56,6 +56,14 @@ add it as a custom repository first:
 
 ### Manual installation
 
+The simplest way: download `anker_prime_charger.zip` from the
+[latest release](https://github.com/Max-src/ha-anker-prime-charger/releases/latest) and
+extract it into a new `custom_components/anker_prime_charger` folder in your Home Assistant
+configuration folder (the folder containing `configuration.yaml`). The zip holds the
+integration's files directly. Then restart Home Assistant and continue to [Setup](#setup).
+
+Or copy it from the repository:
+
 1. Download the repository using **Code > Download ZIP** on
    [GitHub](https://github.com/Max-src/ha-anker-prime-charger), then extract it.
 2. Open your Home Assistant configuration folder, the folder containing `configuration.yaml`.
