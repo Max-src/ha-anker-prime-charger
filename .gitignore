@@ -5,8 +5,8 @@ deploy.bat
 # Anker login cache written by the library (contains tokens)
 authcache/
 
-# Results of the investigation scripts in tools/ (account details)
-tools/*_results.json
+# Coder/debug-only investigation scripts; not part of the published repo
+tools/
 
 # Python / test caches
 __pycache__/
