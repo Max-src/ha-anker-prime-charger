@@ -44,5 +44,3 @@ force-sort-within-sections = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "SLF001"]
-# Interactive command-line scripts: blocking input() is intended
-"tools/*" = ["D", "BLE001", "SLF001", "ASYNC"]

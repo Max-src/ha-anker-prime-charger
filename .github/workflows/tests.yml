@@ -17,9 +17,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
       - name: Ruff check
-        run: ruff check custom_components tests tools scripts
+        run: ruff check custom_components tests scripts
       - name: Ruff format
-        run: ruff format --check custom_components tests tools scripts
+        run: ruff format --check custom_components tests scripts
 
   pytest:
     # Each pytest-homeassistant-custom-component release pins one Home Assistant
