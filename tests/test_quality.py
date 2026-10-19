@@ -6,6 +6,7 @@ from datetime import timedelta
 import importlib
 import json
 from pathlib import Path
+import re
 
 from freezegun.api import FrozenDateTimeFactory
 from pytest_homeassistant_custom_component.common import (
@@ -142,3 +143,9 @@ def test_icons_match_entities_and_actions() -> None:
             assert states <= set(translated.get("state", {})), f"{platform}.{key}"
     actions = yaml.safe_load((COMPONENT / "services.yaml").read_text(encoding="utf-8"))
     assert set(icons["services"]) == set(actions)
+
+
+def test_translations_contain_no_html() -> None:
+    """Hassfest rejects angle-bracket text in translation strings."""
+    strings = (COMPONENT / "translations" / "en.json").read_text(encoding="utf-8")
+    assert not re.findall(r"<[^>\n]*>", strings)

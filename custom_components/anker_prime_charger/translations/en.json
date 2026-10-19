@@ -525,7 +525,7 @@
         },
         "name": {
           "name": "Name",
-          "description": "At most 13 characters, not already used. Empty: shown as Custom <number>, like in the app."
+          "description": "At most 13 characters, not already used. Empty: shown as Custom followed by a number, like in the app."
         },
         "fit": {
           "name": "Fit",
