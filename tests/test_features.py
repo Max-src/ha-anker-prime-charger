@@ -127,8 +127,8 @@ async def test_clock_theme_select(
         "Standard Style - Theme 3",
         "Cosmic - Lunar",
         "Futuristic - Celestial",
+        "Custom - Custom 2",  # unnamed in the app: "Custom <seq>", like the app
         "Custom - Fireworks",
-        "Custom - Image 47833",  # unnamed in the app
     ]
     assert st.attributes["entity_picture"] == STOCK_THEME_URL
 
@@ -151,6 +151,42 @@ async def test_clock_theme_select(
     assert commands[-1][0] == "charger_theme"
     assert last_command_field(cloud, "a2") == "01c3"  # stock image (kind 3)
     assert state(hass, "select", "theme_id") == "Cosmic - Lunar"
+
+
+async def test_custom_images_follow_the_cloud_on_refresh(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+) -> None:
+    """Images added or deleted in the cloud show after Refresh, also the last one."""
+    images = cloud.rest["charger_get_manual_screensavers"]
+
+    def custom_options() -> list[str]:
+        options = attr(hass, "select", "theme_id", "options")
+        return [o for o in options if o.startswith("Custom")]
+
+    async def refresh() -> None:
+        await call(hass, "button", "press", entity_id(hass, "button", "refresh"))
+        await hass.async_block_till_done()
+
+    images["list"].append(
+        {
+            "id": 50075,
+            "img_url": "https://example.com/n.jpg?sig",
+            "short_url": "/n.jpg",
+            "hash_code": "0x5e02fe48",
+            "name": "New",
+            "seq": 3,
+        }
+    )
+    await refresh()
+    assert "Custom - New" in custom_options()
+
+    images["list"] = [i for i in images["list"] if i["id"] != 38820]
+    await refresh()
+    assert "Custom - Fireworks" not in custom_options()
+
+    images["list"] = []
+    await refresh()
+    assert custom_options() == []
 
 
 async def test_standard_style_themes(
@@ -180,7 +216,7 @@ async def test_standard_style_themes(
     assert state(hass, "select", "theme_id") == "Standard Style - Theme 1"
     cloud.mqtt.deliver({"clock_settings": 0xC5, "theme_id": 47833})
     await hass.async_block_till_done()
-    assert state(hass, "select", "theme_id") == "Custom - Image 47833"
+    assert state(hass, "select", "theme_id") == "Custom - Custom 2"
 
 
 async def test_clock_theme_unavailable_without_cloud(

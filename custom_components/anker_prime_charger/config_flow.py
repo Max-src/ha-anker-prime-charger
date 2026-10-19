@@ -9,6 +9,7 @@ from aiohttp import ClientError
 import voluptuous as vol
 
 from homeassistant.config_entries import (
+    ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -269,7 +270,7 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry) -> OptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
         """Return the options flow."""
         return PrimeChargerOptionsFlow()
 

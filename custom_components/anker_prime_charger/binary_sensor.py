@@ -14,6 +14,9 @@ from .entity import PrimeChargerEntity
 from .helpers import is_on
 from .ports import PORTS, Port
 
+# Updates come from the coordinator: no limit needed
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

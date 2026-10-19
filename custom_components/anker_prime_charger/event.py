@@ -9,6 +9,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
 
+# Updates come from the coordinator: no limit needed
+PARALLEL_UPDATES = 0
+
 EVENT_PLAYED = "played"
 
 
@@ -49,7 +52,8 @@ class HiddenAnimationEvent(PrimeChargerEntity, EventEntity):
 
         Defining it opts in: the entity is no longer removed and added again.
         """
-        super().async_entity_id_changed(old_entity_id)
+        # defined from Home Assistant 2026.11, the only versions that call this
+        super().async_entity_id_changed(old_entity_id)  # type: ignore[misc,unused-ignore]
 
     @callback
     def _async_played(self, animation_type: int) -> None:

@@ -39,7 +39,7 @@ MAX_FAST_UPDATES_MINUTES: Final = 60
 
 # The app's test features: key in the cloud "device_setting" -> endpoint that
 # sets it. Request body: {"device_sn": sn, <key>: 0 | 1} (found with
-# tools/probe_cloud.py; not documented upstream).
+# probing the cloud; not documented upstream).
 TEST_FEATURES: Final = {
     "compatibility_status": "mini_power/v1/app/setting/set_compatibility_status",
     "charging_mode_status": "mini_power/v1/app/setting/set_charging_mode_status",

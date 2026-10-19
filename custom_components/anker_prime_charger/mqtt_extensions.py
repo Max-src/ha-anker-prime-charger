@@ -1,6 +1,6 @@
 """A2345 messages and commands the vendored library does not know (or gets wrong).
 
-Decoded with tools/watch_charger.py by watching the Anker app. They are added
+Decoded by watching the Anker app's MQTT messages. They are added
 to the library's model map at runtime, so the vendored files stay unchanged.
 
 - Time display (show the time on top of a custom clock image; stock themes
@@ -28,6 +28,7 @@ from __future__ import annotations
 from typing import Any, Final
 
 from .const import MODEL
+from .solixapi.apitypes import DeviceHexDataTypes
 from .solixapi.mqtt_charger import FEATURES, MODELS
 from .solixapi.mqttcmdmap import (
     BYTES,
@@ -43,7 +44,6 @@ from .solixapi.mqttcmdmap import (
     SolixMqttCommands,
 )
 from .solixapi.mqttmap import SOLIXMQTTMAP
-from .solixapi.mqtttypes import DeviceHexDataTypes
 
 TIME_DISPLAY_COMMAND: Final = "time_display_switch"
 TIME_DISPLAY_STATE: Final = "time_display"

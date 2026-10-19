@@ -1,0 +1,136 @@
+{
+  "3d": {
+    "title": "Anker Prime Charger 3D",
+    "element": "anker-prime-charger-3d-card",
+    "variations": {
+      "overview": {
+        "title": "Three devices charging"
+      },
+      "all-ports": {
+        "title": "Every port in use",
+        "ports": {
+          "c1": [
+            65.3,
+            20.1,
+            3.25
+          ],
+          "c2": [
+            18.2,
+            9.0,
+            2.02
+          ],
+          "c3": [
+            7.4,
+            5.0,
+            1.48
+          ],
+          "c4": [
+            2.6,
+            5.0,
+            0.52
+          ],
+          "a1": [
+            4.9,
+            5.0,
+            0.98
+          ],
+          "a2": [
+            11.8,
+            9.0,
+            1.31
+          ]
+        }
+      },
+      "turned": {
+        "title": "Turned by dragging: the right side and the back",
+        "view": {
+          "yaw": -120,
+          "pitch": 30
+        }
+      },
+      "screensaver-flip": {
+        "title": "Clock screensaver: Standard Style 1",
+        "config": {
+          "show_screensaver": true
+        },
+        "screensaver": {
+          "kind": "style_1"
+        }
+      },
+      "screensaver-digits": {
+        "title": "Clock screensaver: Standard Style 2",
+        "config": {
+          "show_screensaver": true
+        },
+        "screensaver": {
+          "kind": "style_2"
+        }
+      },
+      "screensaver-ring": {
+        "title": "Clock screensaver: Standard Style 3",
+        "config": {
+          "show_screensaver": true
+        },
+        "screensaver": {
+          "kind": "style_3"
+        }
+      },
+      "screensaver-image": {
+        "title": "Clock screensaver: an image, with the time (12h)",
+        "config": {
+          "show_screensaver": true
+        },
+        "screensaver": {
+          "kind": "custom",
+          "time_display": true,
+          "clock_format": "12h"
+        }
+      },
+      "dark": {
+        "title": "Dark theme",
+        "dark": true
+      },
+      "offline": {
+        "title": "The charger offline",
+        "offline": true
+      },
+      "narrow": {
+        "title": "A narrow column (a phone)",
+        "width": 320
+      }
+    },
+    "editors": {
+      "options": "The card's options"
+    }
+  },
+  "outputs": {
+    "title": "Anker Prime Charger outputs",
+    "element": "anker-prime-charger-outputs-card",
+    "variations": {
+      "overview": {
+        "title": "Three devices charging"
+      },
+      "compact": {
+        "title": "Without voltage and current",
+        "config": {
+          "show_details": false
+        }
+      },
+      "dark": {
+        "title": "Dark theme",
+        "dark": true
+      },
+      "offline": {
+        "title": "The charger offline",
+        "offline": true
+      },
+      "narrow": {
+        "title": "A narrow column (a phone)",
+        "width": 320
+      }
+    },
+    "editors": {
+      "options": "The card's options"
+    }
+  }
+}

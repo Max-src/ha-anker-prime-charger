@@ -15,8 +15,12 @@ from . import custom_mode, schedules
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
 from .helpers import to_int
+from .mqtt_extensions import TIMER_STEP
 from .ports import PORTS, USB_C_PORTS, Port
 from .solixapi.mqttcmdmap import SolixMqttCommands
+
+# Send the charger one command at a time
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -66,6 +70,8 @@ class UsbCPowerLimit(PrimeChargerEntity, NumberEntity):
     disconnects the charging devices (see custom_mode.py).
     """
 
+    port: Port
+
     _attr_translation_key = "custom_power_limit"
     _attr_device_class = NumberDeviceClass.POWER
     _attr_native_min_value = 0
@@ -93,11 +99,13 @@ class UsbCPowerLimit(PrimeChargerEntity, NumberEntity):
 class PortTimerDuration(PrimeChargerEntity, NumberEntity):
     """How long the port stays on once its timer is started (whole minutes)."""
 
+    port: Port
+
     _attr_translation_key = "timer_duration"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_native_min_value = schedules.TIMER_STEP // 60
+    _attr_native_min_value = TIMER_STEP // 60
     _attr_native_max_value = schedules.TIMER_MAX // 60
-    _attr_native_step = schedules.TIMER_STEP // 60
+    _attr_native_step = TIMER_STEP // 60
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
     _attr_mode = NumberMode.BOX
 

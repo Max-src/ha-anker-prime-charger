@@ -24,7 +24,7 @@ from homeassistant.util import dt as dt_util
 
 from . import library, themes
 from .const import LOGGER, MODEL
-from .helpers import translated
+from .helpers import to_int, translated
 from .solixapi.api import AnkerSolixApi
 from .solixapi.errors import AnkerSolixError
 
@@ -55,6 +55,10 @@ class CloudSettings:
         self.api = api
         self.device_sn = device_sn
         self.refreshed: datetime | None = None
+        # Custom image id -> its "seq" (the app names unnamed images with it)
+        self._custom_seqs: dict[str, int | None] = {}
+        # Custom image id -> its path in Anker's storage ("short_url")
+        self.custom_paths: dict[str, str] = {}
         # +1 after each refresh: lets entities skip work when nothing was read
         self.generation = 0
         self._stock_themes_refreshed: datetime | None = None
@@ -100,7 +104,7 @@ class CloudSettings:
             ("test features", lambda: api.get_charger_device_setting(deviceSn=sn)),
             ("custom profiles", lambda: api.get_charger_custom_mode_list(deviceSn=sn)),
             ("port labels", lambda: api.get_charger_port_remarks(deviceSn=sn)),
-            ("custom images", lambda: api.get_charger_manual_screensavers(deviceSn=sn)),
+            ("custom images", self._async_read_custom_images),
             ("unlocked animations", self._async_read_easter_eggs),
             ("protocols per power", self._async_read_protocol_ranges),
         ]
@@ -120,8 +124,31 @@ class CloudSettings:
                 LOGGER.exception(
                     "Unexpected answer from the Anker cloud for the %s", what
                 )
-        themes.name_unnamed_custom_themes(self._device.get("screensaver") or {})
+        themes.name_unnamed_custom_themes(
+            self._device.get("screensaver") or {}, self._custom_seqs
+        )
         self.generation += 1
+
+    async def _async_read_custom_images(self) -> None:
+        items = await library.async_read_custom_themes(self.api, self.device_sn)
+        items = [item for item in items if item.get("id") is not None]
+        self._custom_seqs = {str(i["id"]): to_int(i.get("seq")) for i in items}
+        self.custom_paths = {str(i["id"]): str(i.get("short_url") or "") for i in items}
+
+    async def async_refresh_custom_images(self) -> None:
+        """Re-read the custom images now (after adding, renaming or deleting one).
+
+        Raises the cloud's errors.
+        """
+        await self._async_read_custom_images()
+        themes.name_unnamed_custom_themes(
+            self._device.get("screensaver") or {}, self._custom_seqs
+        )
+        self.generation += 1
+
+    def custom_id_of(self, path: str) -> int | None:
+        """The id of the custom image stored at this path."""
+        return next((int(i) for i, p in self.custom_paths.items() if p == path), None)
 
     async def _async_read_easter_eggs(self) -> None:
         data = await library.async_request(

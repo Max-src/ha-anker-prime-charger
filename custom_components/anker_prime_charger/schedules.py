@@ -128,7 +128,11 @@ async def async_set_time(
 ) -> None:
     """Set the time of a schedule's start or end."""
     if port is None:
-        await async_set_clock_schedule(coordinator, **{part: at})
+        await async_set_clock_schedule(
+            coordinator,
+            start=at if part == "start" else None,
+            end=at if part == "end" else None,
+        )
     else:
         await async_set_schedule(coordinator, port, part, at=at)
 
@@ -143,6 +147,8 @@ async def async_set_days(
     weekdays = [day for day in WEEKDAYS if day in weekdays]
     if port is None:
         await async_set_clock_schedule(coordinator, weekdays=weekdays)
+    elif part is None:
+        raise ValueError("A port schedule's days need its part (start or end)")
     else:
         await async_set_schedule(coordinator, port, part, weekdays=weekdays)
 

@@ -126,8 +126,9 @@ def current_allowed_protocols(
 def current_settings(coordinator: PrimeChargerCoordinator) -> CustomSettings:
     """The custom settings the charger reports."""
     data = coordinator.data or {}
-    limits = {port: to_int(data.get(limit_key(port))) for port in PORTS}
-    if None in limits.values():
+    reported = {port: to_int(data.get(limit_key(port))) for port in PORTS}
+    limits = {port: watts for port, watts in reported.items() if watts is not None}
+    if len(limits) < len(reported):
         raise translated(HomeAssistantError, "not_reported")
     return CustomSettings(
         limits=limits,

@@ -10,6 +10,8 @@ They target devices: the charger, or one of its ports (child devices).
   the charger's device is accepted too).
 - Set protocols: the fast-charging protocols of a USB-C port in the custom
   mode (target the port).
+- Custom clock images: add (upload), rename, delete, list (target the Screen
+  device; the charger's device is accepted too). See clock_images.py.
 
 An entity of the integration may be targeted instead of a device: it stands
 for its device. Devices and entities named directly must suit the action (a
@@ -22,7 +24,7 @@ target isn't usable.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -36,7 +38,13 @@ from homeassistant.const import (
     ATTR_FLOOR_ID,
     ATTR_LABEL_ID,
 )
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import (
     config_validation as cv,
@@ -47,8 +55,9 @@ from homeassistant.helpers.target import (
     TargetSelection,
     async_extract_referenced_entity_ids,
 )
+from homeassistant.util.json import JsonValueType
 
-from . import custom_mode, profiles, schedules
+from . import clock_images, custom_mode, profiles, schedules
 from .const import DOMAIN, SCREEN
 from .coordinator import PrimeChargerCoordinator
 from .helpers import WEEKDAYS, translated
@@ -60,6 +69,10 @@ SERVICE_DELETE_PROFILE: Final = "delete_custom_profile"
 SERVICE_SET_CUSTOM_SETTINGS: Final = "set_custom_settings"
 SERVICE_SET_DAYS: Final = "set_days"
 SERVICE_SET_PROTOCOLS: Final = "set_protocols"
+SERVICE_ADD_CLOCK_IMAGE: Final = "add_clock_image"
+SERVICE_RENAME_CLOCK_IMAGE: Final = "rename_clock_image"
+SERVICE_DELETE_CLOCK_IMAGE: Final = "delete_clock_image"
+SERVICE_LIST_CLOCK_IMAGES: Final = "list_clock_images"
 
 # Optional settings fields: "auto_deactivation", "c1_power" ... "a_power",
 # "c1_protocols" ... "c4_protocols"
@@ -85,7 +98,8 @@ class Target:
     screen: bool = False
 
 
-type Handler = Callable[[ServiceCall, Target], Awaitable[None]]
+# A handler may return data for the action's response
+type Handler = Callable[[ServiceCall, Target], Awaitable[dict[str, Any] | None]]
 # Whether an action applies to a device found through an area, floor or label
 type Applies = Callable[[ServiceCall, Target], bool]
 
@@ -98,6 +112,10 @@ def _has_schedule_days(call: ServiceCall, target: Target) -> bool:
     """A port's start or end days with "schedule", else the clock screensaver's."""
     if "schedule" in call.data:
         return target.port is not None
+    return target.screen
+
+
+def _is_screen(call: ServiceCall, target: Target) -> bool:
     return target.screen
 
 
@@ -161,20 +179,58 @@ def async_setup_services(hass: HomeAssistant) -> None:
             _async_set_protocols,
             _is_usb_c_port,
         ),
+        (
+            SERVICE_ADD_CLOCK_IMAGE,
+            {
+                # from the media browser (My media), or a file at an allowed path
+                vol.Optional("image"): vol.Schema(
+                    {vol.Required("media_content_id"): cv.string},
+                    extra=vol.ALLOW_EXTRA,
+                ),
+                vol.Optional("path"): cv.string,
+                vol.Optional("name"): cv.string,
+                vol.Optional("fit", default="fill"): vol.In(clock_images.FITS),
+                vol.Optional("show", default=False): cv.boolean,
+                vol.Optional("frame", default="none"): vol.In(clock_images.FRAMES),
+            },
+            _async_add_clock_image,
+            _is_screen,
+        ),
+        (
+            SERVICE_RENAME_CLOCK_IMAGE,
+            {
+                vol.Required("image"): cv.string,
+                vol.Required("new_name"): cv.string,
+            },
+            _async_rename_clock_image,
+            _is_screen,
+        ),
+        (
+            SERVICE_DELETE_CLOCK_IMAGE,
+            {vol.Required("image"): cv.string},
+            _async_delete_clock_image,
+            _is_screen,
+        ),
+        (SERVICE_LIST_CLOCK_IMAGES, {}, _async_list_clock_images, _is_screen),
     )
+    responses = {
+        SERVICE_ADD_CLOCK_IMAGE: SupportsResponse.OPTIONAL,
+        SERVICE_LIST_CLOCK_IMAGES: SupportsResponse.ONLY,
+    }
     for name, fields, func, applies in actions:
         hass.services.async_register(
             DOMAIN,
             name,
             _for_each_target(hass, func, applies),
             schema=cv.make_entity_service_schema(fields),
+            supports_response=responses.get(name, SupportsResponse.NONE),
         )
 
 
 def _for_each_target(
     hass: HomeAssistant, func: Handler, applies: Applies
-) -> Callable[[ServiceCall], Awaitable[None]]:
-    async def handle(call: ServiceCall) -> None:
+) -> Callable[[ServiceCall], Coroutine[Any, Any, ServiceResponse]]:
+    async def handle(call: ServiceCall) -> ServiceResponse:
         named = _resolve(hass, _named_devices(hass, call))
         found = [
             target
@@ -183,8 +239,15 @@ def _for_each_target(
         ]
         if not (targets := named + found):
             raise translated(ServiceValidationError, "no_target")
-        for target in targets:
-            await func(call, target)
+        results = [await func(call, target) for target in targets]
+        answers = [r for r in results if r is not None]
+        if not answers:
+            return None
+        if len(answers) == 1:
+            return answers[0]
+        # several chargers: one answer per charger
+        chargers: list[JsonValueType] = list(answers)
+        return {"chargers": chargers}
 
     return handle
 
@@ -316,3 +379,45 @@ async def _async_set_protocols(call: ServiceCall, target: Target) -> None:
     await custom_mode.async_apply(
         target.coordinator, protocols={target.port.custom: call.data["protocols"]}
     )
+
+
+def _screen_charger(target: Target) -> PrimeChargerCoordinator:
+    """The coordinator of a targeted Screen device (or its charger)."""
+    if target.port is not None:
+        raise translated(ServiceValidationError, "target_screen")
+    return target.coordinator
+
+
+def _image_answer(image: clock_images.ClockImage) -> dict[str, Any]:
+    return {"id": image.id, "name": image.name, "on_screen": image.on_screen}
+
+
+async def _async_add_clock_image(call: ServiceCall, target: Target) -> dict[str, Any]:
+    coordinator = _screen_charger(target)
+    image = call.data.get("image") or {}
+    data = await clock_images.async_read_source(
+        coordinator.hass, image.get("media_content_id"), call.data.get("path")
+    )
+    added = await clock_images.async_add(
+        coordinator,
+        data,
+        name=call.data.get("name"),
+        fit=call.data["fit"],
+        show=call.data["show"],
+        frame=call.data["frame"],
+    )
+    return _image_answer(added)
+
+
+async def _async_rename_clock_image(call: ServiceCall, target: Target) -> None:
+    await clock_images.async_rename(
+        _screen_charger(target), call.data["image"], call.data["new_name"]
+    )
+
+
+async def _async_delete_clock_image(call: ServiceCall, target: Target) -> None:
+    await clock_images.async_delete(_screen_charger(target), call.data["image"])
+
+
+async def _async_list_clock_images(call: ServiceCall, target: Target) -> dict[str, Any]:
+    return {"images": await clock_images.async_list(_screen_charger(target))}

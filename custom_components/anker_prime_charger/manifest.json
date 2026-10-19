@@ -1,11 +1,19 @@
 {
   "domain": "anker_prime_charger",
   "name": "Anker Prime Charger",
+  "after_dependencies": [
+    "frontend",
+    "lovelace",
+    "media_source"
+  ],
   "codeowners": [
     "@Max-src"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "http",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/Max-src/ha-anker-prime-charger",
   "integration_type": "device",
   "iot_class": "cloud_push",

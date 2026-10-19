@@ -33,6 +33,9 @@ from .entity import PrimeChargerEntity
 from .helpers import is_on, summed_power, to_number
 from .ports import PORTS, Port
 
+# Updates come from the coordinator: no limit needed
+PARALLEL_UPDATES = 0
+
 # Every physical port (MQTT reading names)
 ALL_OUTPUTS: Final = tuple(output for port in PORTS for output in port.outputs)
 
@@ -194,7 +197,8 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
 
         Defining it opts in: the entity is no longer removed and added again.
         """
-        super().async_entity_id_changed(old_entity_id)
+        # defined from Home Assistant 2026.11, the only versions that call this
+        super().async_entity_id_changed(old_entity_id)  # type: ignore[misc,unused-ignore]
 
     def _power(self) -> float | None:
         """Summed power of the outputs (W), or nothing if none was reported."""
@@ -233,6 +237,8 @@ class PortTimerEnd(PrimeChargerEntity, SensorEntity):
     The charger reports the remaining seconds; the library adds when it
     received them.
     """
+
+    port: Port
 
     _attr_translation_key = "timer_end"
     _attr_device_class = SensorDeviceClass.TIMESTAMP

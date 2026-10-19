@@ -1,6 +1,6 @@
 """Clock themes of the Anker Prime Charger integration.
 
-Three kinds of themes (decoded with tools/watch_charger.py):
+Three kinds of themes (decoded by watching the Anker app's MQTT messages):
 - the built-in "Standard Style" themes 1-3: the charger draws the clock in its
   own style on a plain background. They are not in the Anker cloud's theme
   list; the app sends theme id 4, hash 0 and app-internal image paths.
@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from .coordinator import PrimeChargerCoordinator
 
 CUSTOM_CATEGORY: Final = "Custom"  # images added in the Anker app
+# What the app calls a custom image without a name (its "a2345Customized" text)
+UNNAMED_IMAGE: Final = "Custom"
 STANDARD_CATEGORY: Final = "Standard Style"
 # Order of the theme list, as in the app: Standard Styles, stock themes, custom
 CATEGORY_ORDER: Final = {STANDARD_CATEGORY: 0, CUSTOM_CATEGORY: 2}
@@ -69,12 +71,23 @@ def parse_stock_catalogue(resp: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return themes
 
 
-def name_unnamed_custom_themes(custom_themes: dict[str, dict[str, Any]]) -> None:
-    """Custom images can have an empty name in the app; give them one."""
+def name_unnamed_custom_themes(
+    custom_themes: dict[str, dict[str, Any]], seqs: dict[str, int | None]
+) -> None:
+    """Name the custom images that have no name, as the Anker app shows them.
+
+    The app shows "Custom <seq>" (its "a2345Customized" text and the image's
+    "seq" from the cloud list), or "Custom" when seq is 0. Without a seq (not
+    read yet), "Image <id>".
+    """
     for theme_id, theme in custom_themes.items():
-        if not theme.get("title"):
+        if theme.get("title"):
+            continue
+        if (seq := seqs.get(theme_id)) is None:
             theme["title"] = f"Image {theme_id}"
-            theme["theme_name"] = f"{theme.get('category_name')} - {theme['title']}"
+        else:
+            theme["title"] = f"{UNNAMED_IMAGE} {seq}" if seq else UNNAMED_IMAGE
+        theme["theme_name"] = f"{theme.get('category_name')} - {theme['title']}"
 
 
 def all_themes(coordinator: PrimeChargerCoordinator) -> dict[str, dict[str, Any]]:

@@ -21,6 +21,9 @@ from .entity import PrimeChargerEntity
 from .helpers import WEEKDAYS, to_weekdays, translated
 from .ports import PORTS, USB_C_PORTS, Port
 
+# Send the charger one command at a time
+PARALLEL_UPDATES = 1
+
 DAYS_PATTERN = r"^\s*(all|none|(mon|tue|wed|thu|fri|sat|sun)(\s*,\s*(mon|tue|wed|thu|fri|sat|sun))*)\s*$"
 
 
@@ -115,6 +118,8 @@ class PortProtocols(PrimeChargerEntity, TextEntity):
     (every protocol allowed at the port's power) or "none". Changing it
     re-applies the custom mode (see custom_mode.py).
     """
+
+    port: Port
 
     _attr_translation_key = "custom_protocols"
     _attr_entity_category = EntityCategory.CONFIG

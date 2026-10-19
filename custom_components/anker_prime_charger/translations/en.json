@@ -510,6 +510,64 @@
           "description": "The protocols to allow. None selected: none."
         }
       }
+    },
+    "add_clock_image": {
+      "name": "Add clock image",
+      "description": "Upload an image as a custom clock theme, like the Anker app: it is cut to the screen's 480 x 200 and sent to the Anker cloud. Target the charger's Screen device. Returns the new image's id and name.",
+      "fields": {
+        "image": {
+          "name": "Image",
+          "description": "An image from the media browser (Media > My media). Or use Path."
+        },
+        "path": {
+          "name": "Path",
+          "description": "Instead of Image: the path of an image file Home Assistant may read (e.g. in /config/www or /media)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "At most 13 characters, not already used. Empty: shown as Custom <number>, like in the app."
+        },
+        "fit": {
+          "name": "Fit",
+          "description": "Fill: crop the image to fill the screen. Fit: show the whole image, with black bars."
+        },
+        "show": {
+          "name": "Show",
+          "description": "Show it on the charger's screen right away."
+        },
+        "frame": {
+          "name": "Frame",
+          "description": "Draw a frame on the image. None: the image as it is. Dark edges: darkens the image and shades its edges, like the Anker app does."
+        }
+      }
+    },
+    "rename_clock_image": {
+      "name": "Rename clock image",
+      "description": "Rename a custom clock image. Target the charger's Screen device.",
+      "fields": {
+        "image": {
+          "name": "Image",
+          "description": "Name (as shown, e.g. Custom 1 or Beach), Clock theme option (Custom - Beach) or id of the custom image."
+        },
+        "new_name": {
+          "name": "New name",
+          "description": "At most 13 characters, not already used."
+        }
+      }
+    },
+    "delete_clock_image": {
+      "name": "Delete clock image",
+      "description": "Delete a custom clock image from the Anker cloud. If it is on the screen, the charger first switches to Standard Style Theme 1. Target the charger's Screen device.",
+      "fields": {
+        "image": {
+          "name": "Image",
+          "description": "Name (as shown, e.g. Custom 1 or Beach), Clock theme option (Custom - Beach) or id of the custom image."
+        }
+      }
+    },
+    "list_clock_images": {
+      "name": "List clock images",
+      "description": "The custom clock images: id, name, Clock theme option, whether it is on the screen, and a preview link valid for a few minutes. Target the charger's Screen device."
     }
   },
   "selector": {
@@ -540,6 +598,18 @@
       "options": {
         "start": "Scheduled start",
         "end": "Scheduled end"
+      }
+    },
+    "clock_image_fit": {
+      "options": {
+        "fill": "Fill the screen (crop)",
+        "fit": "Whole image (black bars)"
+      }
+    },
+    "clock_image_frame": {
+      "options": {
+        "none": "None",
+        "shade": "Dark edges (like the Anker app)"
       }
     }
   },
@@ -633,6 +703,49 @@
     },
     "schedule_required": {
       "message": "Choose the schedule (start or end) when targeting a port; for the clock screensaver days, target the Screen device"
+    },
+    "target_screen": {
+      "message": "Target the charger's Screen device with this action, not a port"
+    },
+    "image_missing": {
+      "message": "Choose an image (Media > My media) or give the path of an image file"
+    },
+    "image_source_unsupported": {
+      "message": "Only images from Media > My media are supported; for others, give the path of the file"
+    },
+    "path_not_allowed": {
+      "message": "Home Assistant may not read {path}: add its folder to allowlist_external_dirs, or use /config/www or /media"
+    },
+    "image_unreadable_path": {
+      "message": "Can't read the file {path}"
+    },
+    "image_unreadable": {
+      "message": "The file isn't an image Home Assistant can read"
+    },
+    "clock_image_not_found": {
+      "message": "No custom clock image {image} (images: {images})"
+    },
+    "clock_image_name_empty": {
+      "message": "The name can't be empty"
+    },
+    "clock_image_name_too_long": {
+      "message": "The name {name} is longer than {max} characters"
+    },
+    "clock_image_name_used": {
+      "message": "Another custom clock image is already named {name}"
+    },
+    "clock_image_upload_failed": {
+      "message": "The image couldn't be uploaded to the Anker cloud ({reason})"
+    }
+  },
+  "issues": {
+    "charger_not_found": {
+      "title": "{name} is no longer in your Anker account",
+      "description": "The charger {serial} wasn't found in the Anker account used by **{name}**, so Home Assistant can't connect to it and keeps retrying.\n\nIt may have been removed from the account in the Anker app, or moved to another account. Add it back to this account in the Anker app (Home Assistant connects again on its own), or delete **{name}** from Settings > Devices & services."
+    },
+    "charger_offline": {
+      "title": "{name} is offline",
+      "description": "No data has come from **{name}** since {since}, so its entities are unavailable.\n\nCheck that the charger is plugged in and connected to your 2.4 GHz Wi-Fi (the Anker app shows it), and that Home Assistant can reach the internet. This message goes away as soon as the charger answers again."
     }
   }
 }

@@ -107,6 +107,8 @@ STATUS = {
 
 # Port timers and schedules: all off, except a running 1 h timer on USB-C 1
 # (30 min left when reported) and a weekday 07:30 start on USB-A.
+# Anker's image storage (upload links and image links)
+S3_URL = "https://edge-aiot-ohi-prod.s3.example.com"
 TIMER_REPORTED = 1790740000  # when the remaining seconds were received
 for _port in ("usbc_1", "usbc_2", "usbc_3", "usbc_4", "usba"):
     STATUS |= {
@@ -170,7 +172,7 @@ CLOUD = {
             "charging_device_identity_status": 0,
         }
     },
-    # structure as the real cloud returns it (tools/probe_profiles.py)
+    # structure as the real cloud returns it
     "charger_get_charging_modes": {
         "charging_mode_list": [
             {
@@ -372,6 +374,7 @@ class FakeCloud:
     def __init__(self) -> None:
         self.charger_servers: set[str] = {"eu", "com"}
         self.devices: list[dict[str, Any]] = [dict(DEVICE)]
+        self.uploads = 0  # upload links handed out
         self.auth_error: Exception | None = None
         self.bind_error: Exception | None = None
         self.charger_silent = False
@@ -408,6 +411,8 @@ class FakeCloud:
         if key.endswith("/delete_charging_mode"):
             profiles[:] = [p for p in profiles if p["id"] != payload["id"]]
             return {"code": 0, "msg": "success!", "data": {}}
+        if key.startswith(("app/cloudstor/", "mini_power/v1/app/style/")):
+            return self._clock_image_request(key, payload)
         if key == "charger_set_port_remark" and self.ignore_port_labels:
             return {"code": 0, "msg": "success!"}
         if key == "charger_set_port_remark":
@@ -421,6 +426,40 @@ class FakeCloud:
         if isinstance(answer, Exception):
             raise answer
         return {"code": 0, "msg": "success!", "data": copy.deepcopy(answer)}
+
+    def _clock_image_request(self, key: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Custom clock image endpoints, like the Anker cloud (see clock_images.py)."""
+        images = self.rest["charger_get_manual_screensavers"]["list"]
+        ok = {"code": 0, "msg": "success!", "data": {}}
+        if key.endswith("get_app_up_token_general"):
+            self.uploads += 1
+            path = (
+                f"/anker_power/edge/screen_saver/test/{self.uploads}.cropped_image.jpg"
+            )
+            return ok | {"data": {"uptoken": f"{S3_URL}{path}?sig", "key_prefix": path}}
+        if key.endswith("add_manual_clock_screensavers"):
+            images.append(
+                {
+                    "id": max((i["id"] for i in images), default=50000) + 1,
+                    "img_url": f"{S3_URL}{payload['img_url']}?sig",
+                    "short_url": payload["img_url"],
+                    "hash_code": payload["hash_code"],
+                    "name": "",
+                    "seq": max((i["seq"] for i in images), default=0) + 1,
+                }
+            )
+            return ok
+        if key.endswith("set_manual_clock_screensaver_name"):
+            for image in images:
+                if image["id"] == payload["screensaver_id"]:
+                    image["name"] = payload["name"]
+            return ok
+        if key.endswith("delete_manual_clock_screensavers"):
+            images[:] = [i for i in images if i["id"] != payload["id"]]
+            return ok
+        if key.endswith("style/get_url"):
+            return ok | {"data": {"url": f"{S3_URL}{payload['short_url']}?fresh"}}
+        return self.rest[key]
 
     @property
     def api(self) -> AnkerSolixApi:

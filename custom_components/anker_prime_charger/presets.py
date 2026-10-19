@@ -76,7 +76,8 @@ class PresetSelect(PrimeChargerEntity, SelectEntity, RestoreEntity):
 
         Defining it opts in: the entity is no longer removed and added again.
         """
-        super().async_entity_id_changed(old_entity_id)
+        # defined from Home Assistant 2026.11, the only versions that call this
+        super().async_entity_id_changed(old_entity_id)  # type: ignore[misc,unused-ignore]
 
     @property
     def current_option(self) -> str | None:
@@ -148,6 +149,8 @@ class ProtocolsPresetSelect(PresetSelect):
     For a text.PortProtocols entity. Changing it re-applies the custom mode
     (see custom_mode.py).
     """
+
+    port: Port
 
     _attr_translation_key = "custom_protocols_preset"
     _attr_options = ["all", "none", CUSTOM]

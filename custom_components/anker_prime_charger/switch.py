@@ -23,6 +23,9 @@ from .mqtt_extensions import TIME_DISPLAY_COMMAND, TIME_DISPLAY_STATE
 from .ports import PORTS, Port
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
+# Send the charger one command at a time
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -71,11 +74,15 @@ class ReportedSwitch(PrimeChargerEntity, SwitchEntity):
 class PortSwitch(ReportedSwitch):
     """The port on or off (USB-A: both USB-A ports; the charger has one switch)."""
 
+    port: Port
+
     _attr_name = None  # the port device's name
 
     def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
         """Initialize."""
         super().__init__(coordinator, f"{port.key}_switch", port)
+        # for its icon (icons.json); the name stays the port device's
+        self._attr_translation_key = "usb_c_port" if port.is_usb_c else "usb_a_port"
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
@@ -85,6 +92,8 @@ class PortSwitch(ReportedSwitch):
 
 class PortTimerSwitch(ReportedSwitch):
     """Turn the port off after the timer duration (see schedules.py)."""
+
+    port: Port
 
     _attr_translation_key = "timer"
     _attr_entity_category = EntityCategory.CONFIG
@@ -99,6 +108,8 @@ class PortTimerSwitch(ReportedSwitch):
 
 class PortScheduleSwitch(ReportedSwitch):
     """Enable the scheduled start or end of a port (see schedules.py)."""
+
+    port: Port
 
     _attr_entity_category = EntityCategory.CONFIG
 

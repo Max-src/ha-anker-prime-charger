@@ -16,9 +16,11 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.typing import ConfigType
 
+from . import issues
 from .const import CONF_DEVICE_SN, CONF_SERVER, DOMAIN
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import charger_device_info
+from .frontend import async_remove_frontend, async_setup_frontend
 from .helpers import translated
 from .library import create_api
 from .services import async_setup_services
@@ -48,8 +50,9 @@ RETIRED_ENTITIES: Final = (
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the actions."""
+    """Register the actions and the dashboard cards."""
     async_setup_services(hass)
+    await async_setup_frontend(hass)
     return True
 
 
@@ -72,7 +75,9 @@ async def async_setup_entry(
 
     device_sn = entry.data[CONF_DEVICE_SN]
     if device_sn not in api.devices:
+        issues.async_raise(hass, entry, issues.CHARGER_NOT_FOUND, serial=device_sn)
         raise translated(ConfigEntryNotReady, "charger_not_found", serial=device_sn)
+    issues.async_clear(hass, entry, issues.CHARGER_NOT_FOUND)
 
     _remove_retired_entities(hass, entry)
     coordinator = PrimeChargerCoordinator(hass, entry, api, device_sn)
@@ -94,7 +99,20 @@ async def async_unload_entry(
     """Unload a config entry and close the MQTT connection."""
     if unloaded := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         await entry.runtime_data.async_stop()
+        # raised again by the next setup if the charger still isn't answering
+        issues.async_clear(hass, entry, issues.CHARGER_OFFLINE)
     return unloaded
+
+
+async def async_remove_entry(
+    hass: HomeAssistant, entry: PrimeChargerConfigEntry
+) -> None:
+    """Remove the entry's repair issues with it, and the cards with the last one."""
+    issues.async_clear(hass, entry)
+    hass.data.get(issues.DATA_SILENT_SINCE, {}).pop(entry.entry_id, None)
+    others = hass.config_entries.async_entries(DOMAIN)
+    if not any(other.entry_id != entry.entry_id for other in others):
+        await async_remove_frontend(hass)
 
 
 def _remove_retired_entities(

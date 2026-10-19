@@ -140,3 +140,70 @@ set_protocols:
       integration: anker_prime_charger
   fields:
     protocols: *protocols
+add_clock_image:
+  target:
+    entity:
+      integration: anker_prime_charger
+  fields:
+    image:
+      selector:
+        media:
+          accept:
+          - image/*
+    path:
+      example: /config/www/clock/photo.jpg
+      selector:
+        text:
+    name:
+      example: Holiday
+      selector:
+        text:
+    fit:
+      default: fill
+      selector:
+        select:
+          translation_key: clock_image_fit
+          options:
+          - fill
+          - fit
+    show:
+      default: false
+      selector:
+        boolean:
+    frame:
+      default: none
+      selector:
+        select:
+          translation_key: clock_image_frame
+          options:
+          - none
+          - shade
+rename_clock_image:
+  target:
+    entity:
+      integration: anker_prime_charger
+  fields:
+    image:
+      required: true
+      example: Custom 1
+      selector:
+        text:
+    new_name:
+      required: true
+      example: Beach
+      selector:
+        text:
+delete_clock_image:
+  target:
+    entity:
+      integration: anker_prime_charger
+  fields:
+    image:
+      required: true
+      example: Custom 1
+      selector:
+        text:
+list_clock_images:
+  target:
+    entity:
+      integration: anker_prime_charger

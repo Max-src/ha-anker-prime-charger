@@ -1,0 +1,128 @@
+name: Documentation Screenshots
+
+# Captures the dashboard cards' screenshots in a disposable Home Assistant and,
+# on main, commits the ones that changed with the README galleries
+# (docs/DOCUMENTATION_SCREENSHOTS.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "custom_components/anker_prime_charger/www/**"
+      - "tests/card-docs*"
+      - "package*.json"
+      - "README.md"
+      - "images/cards/**"
+      - ".github/workflows/documentation-screenshots.yaml"
+  pull_request:
+    paths:
+      - "custom_components/anker_prime_charger/www/**"
+      - "tests/card-docs*"
+      - "package*.json"
+      - "README.md"
+      - "images/cards/**"
+      - ".github/workflows/documentation-screenshots.yaml"
+  workflow_dispatch:
+  schedule:
+    # monthly: catch Home Assistant frontend changes
+    - cron: "17 6 1 * *"
+
+concurrency:
+  group: documentation-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Capture
+    # not after our own commit of the images, or it would run forever
+    if: "!contains(github.event.head_commit.message, '[docs-generated]')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      homeassistant:
+        # the "stable" Home Assistant of tests.yml
+        image: ghcr.io/home-assistant/home-assistant:2026.9.4
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "curl --fail http://localhost:8123/api/onboarding || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Capture the screenshots
+        run: npm run docs:screenshots
+        env:
+          DOCS_HA_URL: http://127.0.0.1:8123
+          DOCS_HA_ONBOARD: "1"
+      - name: Check the README galleries
+        run: npm run docs:check
+      - name: Captures of the images that could not be verified
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: card-documentation-diagnostics
+          path: test-results/card-docs/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: card-documentation-screenshots
+          path: images/cards/*.png
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Commit the images
+    needs: screenshots
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check that main has not moved on
+        id: revision
+        env:
+          CAPTURE_SHA: ${{ github.sha }}
+        run: |
+          if [ "$(git rev-parse HEAD)" = "$CAPTURE_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping: main has advanced since the capture."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.revision.outputs.current == 'true'
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4
+        if: steps.revision.outputs.current == 'true'
+        with:
+          name: card-documentation-screenshots
+          path: images/cards
+      - name: Commit the changed images and galleries
+        if: steps.revision.outputs.current == 'true'
+        run: |
+          node tests/card-docs-readme.cjs
+          git add -- README.md images/cards
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: refresh the cards' screenshots [docs-generated]"
+          git push origin HEAD:main

@@ -16,6 +16,7 @@
 | `mqtt_extensions.py`           | What we add to or correct in the library's description of the charger's messages                                                                                                                                                                |
 | `ports.py`                     | The five ports (USB-C 1-4, USB-A) and their child devices; how each port is named in MQTT, the custom mode and the cloud; maximum power, priority options. **The one place for port facts**: the other modules derive their tables from `PORTS` |
 | `themes.py`                    | Clock themes: Standard Styles, theme list, current theme, theme command                                                                                                                                                                         |
+| `clock_images.py`              | Custom clock images: prepare (480x200 JPEG, optional frame), upload, add, rename, delete, list; names checked like the app (13 characters, unique). New frames: a function in `FRAMES`, plus its option in `services.yaml` and the `clock_image_frame` translations |
 | `custom_mode.py`               | Custom charging mode settings: limits, protocols, checks, the `0206` command                                                                                                                                                                    |
 | `profiles.py`                  | Custom profiles in the cloud: save, create, delete                                                                                                                                                                                              |
 | `schedules.py`                 | Port timers and schedules, clock screensaver schedule, days presets; schedules are addressed as `(port, part)`, port `None` = clock screensaver                                                                                                 |
@@ -23,7 +24,11 @@
 | `helpers.py`                   | Value conversions (`to_number`, `to_int`, `is_on`, weekdays), `on_off`, `summed_power`, `translated` (errors with their message in `en.json` "exceptions")                                                                                      |
 | `entity.py`                    | Base entity: on the charger's device, a port's child device or the Screen child device (`screen=True`), unique id `<serial>_<unique_key or key>`; available once the key is reported (`_needs_key = False` for entities not bound to one value) |
 | `presets.py`                   | Preset selects (days, protocols): common values for a list a text entity edits                                                                                                                                                                  |
-| `binary_sensor.py` … `time.py` | One file per Home Assistant platform                                                                                                                                                                                                            |
+| `issues.py`                    | Repair issues: charger no longer in the account, charger offline for an hour (silence counted across setup retries)                                                                                                                             |
+| `binary_sensor.py` … `time.py` | One file per Home Assistant platform, each with `PARALLEL_UPDATES` (0 read-only, 1 sending commands)                                                                                                                                            |
+| `icons.json`                   | Entity and action icons, by translation key (the port switches use `usb_c_port` / `usb_a_port`, for the icon only)                                                                                                                              |
+| `frontend.py`                  | Dashboard cards: serves `www/` (revalidated on every load), registers `cards.js` as a dashboard resource, websocket commands `anker_prime_charger/charger` (a charger's ports and screen, their entity ids) and `anker_prime_charger/screensaver` (the selected clock theme, a fresh link to its picture)                                              |
+| `www/`                         | The cards (Lit, plain ES modules, no build step); see *Dashboard cards* below                                                                                                                                                                   |
 | `solixapi/`                    | The vendored library, unchanged                                                                                                                                                                                                                 |
 
 Entities read the charger's values from `coordinator.data` (the decoded MQTT values) and cloud
@@ -68,7 +73,7 @@ pip install pytest-homeassistant-custom-component
 pytest
 ```
 
-From Windows, in the WSL test environment the `tools/*.ps1` launchers use (`/root/ha-test-venv`):
+From Windows, in a WSL environment with the test requirements (here `/root/ha-test-venv`):
 
 ```powershell
 $repo = (wsl -d Ubuntu -u root -- wslpath -a ($PWD.Path -replace '\\', '/')).Trim()
@@ -84,6 +89,46 @@ pinned by a `pytest-homeassistant-custom-component` release: **minimum** (the ve
 warning that may fail without blocking. It also runs weekly. When a new Home Assistant release is
 out, bump the _stable_ pin, and the _minimum_ one together with `hacs.json`.
 
+## Dashboard cards
+
+The cards live in `www/`, served at `/anker_prime_charger/` and loaded by the dashboards as one
+module, `cards.js` (a dashboard resource the integration adds, or `add_extra_js_url` when
+resources are in YAML). They are plain ES modules: no build step, edit and reload the page.
+
+| File                       | What it does                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `cards.js`                 | The module the dashboards load: imports each card                                                  |
+| `card-base.js`             | `ChargerCard`, the shared base: config (`device`), loading the charger, rendering only when a shown state changed, editor, sizes |
+| `card-editor.js`           | The visual editor: Home Assistant's `ha-form`, the charger picker then each card's `editorSchema`; saves the card's `completeConfig` |
+| `charger.js`               | Asks the integration for the charger's ports (websocket, cached per entity registry), reads and formats a port; `chargerSummary` (offline, ports in use, screen text) for the 3D card |
+| `charger-3d-card.js`       | The 3D card: turning it (drag, arrow keys; `drag_to_rotate`), each card's view remembered in the user's frontend data (`frontend/set_user_data`, key `anker_prime_charger_3d_views`, by the card's `view_id`, which the editor adds) |
+| `charger-screensaver.js`   | The clock screensaver on the 3D card's screen (480 x 200): our Standard Styles, a theme's picture with the time; the date as the charger writes it |
+| `charger-model.js`         | The 3D model in millimetres, drawn as SVG from any angle (see below); its styles (`modelStyles`)   |
+| `charger-outputs-card.js`  | The USB-C / USB-A output panels                                                                    |
+| `registration.js`          | `defineOnce`, `registerCustomCard`: safe when the module is loaded twice                           |
+| `styles.js`                | Styles every card shares: `--anker-port-active-color` (a port in use), the offline look            |
+| `lib/lit-all.js`           | Lit 2.8.0 as one ES module (built with esbuild from `lit`; the cards can't import it by package name) |
+
+Cards find their entities through the integration (by unique id), never by entity id, so renamed
+entities and devices keep working. A port is "in use" when its **Connected** binary sensor is on.
+
+The 3D model is ours: no Anker artwork, logo or trademark (Anker's terms don't allow
+republishing the app's images). Its geometry is at the top of `charger-model.js`.
+
+The 3D model needs no 3D library: it is seen with a gentle perspective (`CAMERA_DISTANCE`).
+Outlines are projected point by point; a small detail on a surface (screen text, a port, the
+knob) is drawn in the surface's 2D coordinates with the perspective's transform at its place. Surfaces facing away are skipped, the rest drawn back to front and
+shaded by how much they face the light. Cables are drawn after the body when their port's side is
+seen, before it otherwise (the body's faces are too large to sort them by depth alone).
+
+The README's screenshots of the cards are generated in a real Home Assistant frontend (CI does
+it on main): see [DOCUMENTATION_SCREENSHOTS.md](DOCUMENTATION_SCREENSHOTS.md). A new card or
+option gets its scenarios in `tests/card-docs-catalogue.json`.
+
+To add a card: a `ChargerCard` subclass with `_watched()` (the states it shows),
+`_renderCharger()`, optionally `editorSchema`; import it in `cards.js`; add its files to
+`test_every_card_file_exists` in `tests/test_frontend.py`.
+
 ## Lint and format
 
 ```bash
@@ -94,28 +139,24 @@ ruff format custom_components tests tools
 The configuration is in `pyproject.toml` (close to Home Assistant's); the vendored library is
 excluded.
 
+Types are checked with strict mypy (the vendored library excluded):
+
+```bash
+mypy --strict --follow-imports=silent --ignore-missing-imports --exclude solixapi custom_components/anker_prime_charger
+```
+
 ## Updating the vendored library
 
 1. Replace `solixapi/` with the new upstream version and update `solixapi/VERSION.txt`.
 2. Run `tests/test_library_contract.py`, then the whole suite.
 3. If upstream now covers something `mqtt_extensions.py` adds or corrects, remove it there.
 
-## Investigation scripts (`tools/`)
+## How the protocol was found
 
-Each script runs in the WSL test environment through its `.ps1` launcher. It asks for the Anker
-login in the terminal (kept in memory only), asks before every change and undoes it, deletes the
-library's login cache when done, and writes its results (serial, user id hash and signed links
-masked; git-ignored) next to it.
-
-| Script           | Purpose                                                                                                                                                                                                                                                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `watch_charger`  | Read-only. Snapshots while you use the app: the app's commands to the charger, what the charger reports, which bytes changed, and any port whose power dropped (live port values every second). The way to decode new settings. `watch_charger.ps1 <name>` writes `watch_charger_<name>_results.json`, keeping earlier captures |
-| `validate`       | Whether cloud-side settings (protocols per mode, test features) actually reach the charger                                                                                                                                                                                                                                      |
-| `probe_cloud`    | Found the test features' request format                                                                                                                                                                                                                                                                                         |
-| `probe_themes`   | Clock image format and the custom image endpoints                                                                                                                                                                                                                                                                               |
-| `probe_profiles` | Profile update format                                                                                                                                                                                                                                                                                                           |
-
-`tools/common.py` holds what they share (login, requests, field discovery, masking).
+By watching the MQTT messages of the owner's account while using the Anker app (what the app
+sends, what the charger reports, which bytes change), and by probing the cloud's REST endpoints
+(an incomplete request names its missing field). [PROTOCOL.md](PROTOCOL.md) records the results;
+everything the integration relies on was checked against a real charger.
 
 ## Adding a model
 
@@ -139,9 +180,9 @@ What is specific to the A2345 today, and would become per-model:
 | `custom_mode.py`                       | Total power limit (`TOTAL_MAX`), USB-A options                                                                 |
 | `themes.py`                            | The Standard Styles' image paths                                                                               |
 | Platforms                              | Which entities exist: a model only gets the features it has                                                    |
-| `tests/conftest.py`, `tools/common.py` | The test charger and the model the scripts look for                                                            |
+| `tests/conftest.py`                     | The test charger                                                                                               |
 
-A new model needs someone who owns it: run `tools/watch_charger` while using each feature in the
+A new model needs someone who owns it: watch its MQTT messages while using each feature in the
 app, compare with [PROTOCOL.md](PROTOCOL.md), and only expose what is verified.
 
 ## Deploy to Home Assistant (local)

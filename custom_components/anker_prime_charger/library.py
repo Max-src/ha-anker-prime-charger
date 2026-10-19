@@ -8,6 +8,7 @@ rely on changed.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Final
 
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
@@ -24,15 +25,22 @@ ENDPOINTS: Final = {
     "easter_eggs": API_ENDPOINTS["charger_get_triggers"],
     # {"device_model"} -> protocols per USB-C port and power range
     "power_range_protocols": "mini_power/v1/app/setting/get_power_range_support_protocols",
-    # custom profiles (found with tools/probe_profiles.py and tools/validate.py)
+    # custom profiles (found by probing the cloud)
     "update_charging_mode": "mini_power/v1/app/charging/update_charging_mode",
     "add_charging_mode": "mini_power/v1/app/charging/add_charging_mode",
     "delete_charging_mode": "mini_power/v1/app/charging/delete_charging_mode",
+    # custom clock images (from the decompiled app, verified with
+    # probing the cloud; see clock_images.py)
+    "upload_token": "app/cloudstor/get_app_up_token_general",
+    "add_custom_theme": "mini_power/v1/app/style/add_manual_clock_screensavers",
+    "rename_custom_theme": "mini_power/v1/app/style/set_manual_clock_screensaver_name",
+    "delete_custom_theme": "mini_power/v1/app/style/delete_manual_clock_screensavers",
+    "theme_url": "mini_power/v1/app/style/get_url",
 } | TEST_FEATURES
 
 
 def create_api(
-    hass: HomeAssistant, data: dict[str, Any], server: str | None = None
+    hass: HomeAssistant, data: Mapping[str, Any], server: str | None = None
 ) -> AnkerSolixApi:
     """Create the API client, optionally forcing the server ("eu" or "com").
 
@@ -63,6 +71,20 @@ async def async_request(
     """
     resp = await api.apisession.request("post", ENDPOINTS[endpoint], json=body)
     return resp.get("data") or {}
+
+
+async def async_read_custom_themes(api: AnkerSolixApi, sn: str) -> list[dict[str, Any]]:
+    """Read the charger's custom clock images into the library's cache.
+
+    Returns the cloud's list as is: the library keeps only some fields (not
+    "seq"). It also ignores an empty list, so the images deleted last would
+    stay listed: clear them then.
+    """
+    data = await api.get_charger_manual_screensavers(deviceSn=sn)
+    items = list((data or {}).get("list") or [])
+    if not items and sn in api.devices:
+        api.devices[sn]["screensaver"] = {}
+    return items
 
 
 def store_stock_themes(api: AnkerSolixApi, model: str, themes: dict[str, Any]) -> None:

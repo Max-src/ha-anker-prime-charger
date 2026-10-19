@@ -5,7 +5,7 @@ A profile has per port ("C1".."C4", "A"): "power" in W, "max_power" and a
 xiaomi), plus "number" (1-4), "name", "auto_exit", "total_power" (the sum of
 the port powers), "max_total_power" (250) and "has_charge_protocol" (1).
 
-Verified with tools/probe_profiles.py and tools/validate.py, on
+Verified against the Anker cloud, on
 mini_power/v1/app/charging/:
 - update_charging_mode: the profile as listed, plus "device_sn";
 - add_charging_mode: the same without "id", with a free "number"; the cloud

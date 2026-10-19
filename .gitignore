@@ -17,3 +17,7 @@ __pycache__/
 
 # Release zip built by scripts/release-zip.py (attached to releases by CI)
 /anker_prime_charger.zip
+
+# Documentation screenshots tooling (docs/DOCUMENTATION_SCREENSHOTS.md)
+node_modules/
+test-results/

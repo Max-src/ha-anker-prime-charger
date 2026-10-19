@@ -384,6 +384,28 @@ async def test_selects(
     assert hass.states.get(eid).state == option
 
 
+async def test_usage_mode_not_resent(
+    hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """The active mode isn't sent again: any mode change restarts every port."""
+    eid = entity_id(hass, "select", "usage_mode")
+    assert hass.states.get(eid).state == "port_priority"
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {ATTR_ENTITY_ID: eid, "option": "port_priority"},
+        blocking=True,
+    )
+    assert commands == []
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {ATTR_ENTITY_ID: eid, "option": "ai_power"},
+        blocking=True,
+    )
+    assert commands == [("charger_usage_mode", "ai_power", "set_usage_mode")]
+
+
 async def test_usage_mode_custom_is_unknown(
     hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
 ) -> None:

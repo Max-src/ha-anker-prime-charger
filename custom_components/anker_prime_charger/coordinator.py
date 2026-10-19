@@ -32,6 +32,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from . import issues
 from .cloud import CloudSettings
 from .const import (
     CONF_SCAN_INTERVAL,
@@ -121,7 +122,9 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not (session and session.is_connected()):
             LOGGER.debug("Connecting to Anker MQTT server")
             session = await self.api.startMqttSession(
-                message_callback=self._mqtt_message
+                # the library's MessageCallback says bool for the 7th argument;
+                # it passes the decoded values (dict), as _mqtt_message expects
+                message_callback=self._mqtt_message  # type: ignore[arg-type]
             )
             if not session:
                 raise translated(UpdateFailed, "mqtt_connect_failed")
@@ -211,6 +214,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """A message from the charger: it is reachable, push its values."""
         self.last_message = dt_util.utcnow()
         self._got_data.set()
+        issues.async_heard(self.hass, self.config_entry)
         recovered = not self.last_update_success
         self.last_update_success = True
         self._async_push(force=recovered)
@@ -254,6 +258,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The reply arrives asynchronously through the MQTT callback, so this
         mostly returns the values we already have.
         """
+        # before anything else: also when the MQTT connection keeps failing
+        issues.async_check_offline(self.hass, self.config_entry)
         mdev = await self.async_ensure_mqtt()
         if await mdev.status_request() is None:
             raise translated(UpdateFailed, "status_request_failed")

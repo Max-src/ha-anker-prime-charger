@@ -10,6 +10,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
 
+# Send the charger one command at a time
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

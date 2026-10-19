@@ -1,18 +1,18 @@
 # How the Anker Prime Charger 250W (A2345) talks
 
 What the integration relies on, and how each part was found. "Verified" means checked against a
-real charger and the real Anker cloud with the scripts in `tools/` (see
-[DEVELOPMENT.md](DEVELOPMENT.md)).
+real charger and the real Anker cloud (see
+[DEVELOPMENT.md](DEVELOPMENT.md#how-the-protocol-was-found)).
 
 ## Connections
 
 - **MQTT (Anker's broker).** The charger publishes on `dt/anker_power/A2345/<serial>/…` and
   receives commands on `cmd/anker_power/A2345/<serial>/…`. The owner account can listen to both,
-  which is how the app's commands were captured (`tools/watch_charger.py`).
+  which is how the app's commands were captured.
 - **REST (Anker cloud).** Settings stored in the cloud, under `mini_power/v1/app/…`. Requests are
   POSTs with a JSON body; the server answers `{"code": 0, "data": …}` on success. Incomplete
   requests get a 400 answer naming the missing field (`field "x" is not set`), which is how
-  request formats were learned (`tools/common.py`, `discover_fields`).
+  request formats were learned.
 
 Messages are binary: a header, a 2-byte message type (e.g. `0a00`), then fields (`a1`, `a2`, …:
 name, length, type, value) and an XOR checksum. The vendored library encodes and decodes them;
@@ -85,12 +85,14 @@ charger then re-applies power on all ports (connected devices briefly disconnect
   The cloud's table never allows it on the A2345 and the app doesn't show it; the actions accept
   the name, but it is refused while the table is loaded.
 - **Changing a limit or protocols** can only be done with `0206`, which carries the whole set and
-  the mode (5, custom); there is no per-port command. Verified with `tools/watch_charger` (live
+  the mode (5, custom); there is no per-port command. Verified by watching the charger's messages (live
   port values every second): changing one unused port's limit or protocols **in the app** sends
   the same `0206` as the integration (e.g. `a2` `05`, `a3` `01000f1619140f`, `a4`
   `0200000b00000b0000020000`), and every port drops to 0 W (status 0) at once, then renegotiates
   within 2-4 s. The same happens from Home Assistant. It is the charger's behaviour; the only way
-  to limit it is to send several changes in one command.
+  to limit it is to send several changes in one command. Switching between the built-in modes
+  (`0206` with mode 1-4) does the same: the app's `setChargingMode` sends only that one command
+  (adding the per-port protocols for a custom profile), with nothing before or after.
 - Around a custom-mode change the app also sends `0223` (`a2` `00` / `01`, meaning unknown) and
   `0214`; they don't avoid the cut. Status field `0a00` `bb` went from `01` to `00` after the
   app's change (not after the integration's): meaning unknown, perhaps "settings differ from the
@@ -109,11 +111,39 @@ charger then re-applies power on all ports (connected devices briefly disconnect
 | Port labels | `setting/set_port_remark` `{"device_sn", "port_name": "C1"…"A2", "remark"}` | Library |
 | Unlocked animations | `egg/get_easter_egg_trigger_list` `{"device_sn"}` → `egg_trigger_list` | Verified |
 | Custom images: list | `style/get_manual_clock_screensavers` `{"sn"}` | Library |
-| Custom images: add / delete | `style/add_manual_clock_screensavers` `{"sn", "img_url", "hash_code"}` (a file already in Anker's storage), `style/delete_manual_clock_screensavers` `{"id"}` | Verified, not used (no upload endpoint) |
-| Protocols per mode | `setting/get_protocol_status` / `set_protocol_status` (modes `ai`, `normal`) | Read verified; whether a change reaches the charger: `tools/validate.py` |
+| Custom images: add / rename / delete | `style/add_manual_clock_screensavers` `{"sn", "img_url", "hash_code"}`, `style/set_manual_clock_screensaver_name` `{"sn", "screensaver_id", "name"}`, `style/delete_manual_clock_screensavers` `{"id"}` | Verified; used by the clock image actions (`clock_images.py`) |
+| Custom images: real link | `style/get_url` `{"short_url"}` → `{"url"}` (a fresh signed link) | Verified |
+| Protocols per mode | `setting/get_protocol_status` / `set_protocol_status` (modes `ai`, `normal`) | Read verified; whether a change reaches the charger: not verified |
 
 Clock images are baseline JPEGs of 480×200 pixels; the theme hash is the CRC32 of the file. The
 charger only shows images from Anker's storage (one served by Home Assistant was tried).
+
+**Uploading a custom image** (from the decompiled app 3.24.3, verified 2026-10-16 with
+an upload probe; the image showed in the app and on the charger):
+
+1. `POST app/cloudstor/get_app_up_token_general` (not under `mini_power`) with
+   `{"file_name": "cropped_image.jpg", "content_type": "binary/octet-stream", "file_size": <bytes>,
+   "disable_ssl": false, "type": 106}` → `{"uptoken", "key_prefix"}`. `type` is a file type and
+   is required: 106 is the clock image (the app uses 1108 in another mode of its crop page); 0, 1
+   and 2 exist but answer `80009` "violation of other parameter filling rules corresponding to
+   file_type". No user or terminal id is needed.
+2. `PUT` the file to `uptoken` (a pre-signed S3 link) with `Content-Type: binary/octet-stream` →
+   HTTP 200.
+3. `style/add_manual_clock_screensavers` with `img_url` = `key_prefix` (the object's path, e.g.
+   `/anker_power/edge/screen_saver/2026/10/16/<account hash>/<random>.cropped_image.jpg`, which
+   later shows as the image's `short_url`) and `hash_code` = `0x` + CRC32 in hex.
+4. Show it with the theme command (`0205`, kind 5): the app puts the image link in field `a7`
+   (stock themes use `a6`), the image id in `a3` and the CRC32 in `a4` (little-endian).
+
+What else the app's code shows (`a2345custom_clock`, `a2345clock_style`):
+
+- Names: at most 13 characters, and not one already used.
+- After a theme change the charger downloads the image and reports a download state; on failure
+  the app shows "screen saver switching failure" and switches back to the previous theme.
+- The app caches the custom image list (`cachedCustomScreensavers`) and finds the current theme
+  from the charger's theme id in that list. An image added elsewhere (e.g. from Home Assistant)
+  isn't found until the app reloads it, so it shows another theme as selected for a while.
+- With no custom image, the app disables the clock switch of the custom category.
 
 ## Other models on the account
 
@@ -147,5 +177,21 @@ cloud messages but AES-GCM encryption and a different handshake.
 - **Energy statistics:** `power/get_day_power_data` refuses every date format tried. The charger
   doesn't report energy either, so the integration computes it from the power values.
 - **Port protocol status:** `setting/get_port_protocol_status` needs a `version` that wasn't found.
-- **Upload of clock images**, **playing hidden animations**, **choosing a holiday**, **brightness
+- **Playing hidden animations:** the app has no command for it either. Its easter-egg page
+  (`a2345easter_egg`) only reads the unlocked list (`egg/get_easter_egg_trigger_list`), records
+  that you looked at them (`egg/report_easter_egg_trigger_status`), and plays its own Lottie copy
+  on the phone. The charger plays them on its own and reports each one (`0305`). The app's hints
+  (`a2345EasterEgg…Tips`): main screen switched 20 times in 10 s (Feature 1) or 15 times (Play
+  bad); same USB-C port plugged and unplugged 10 times in 60 s (Feature 2, type 5) or 5 times in
+  10 s (Dizziness); every port in use (Device Expert); port priority changed 10 times (Feature
+  Expert); 3 high-performance laptops at once (Power Expert).
+  Verified 2026-10-17 from Home Assistant (3 rounds each):
+  changing the port priority 10 times plays type 1 (Feature Expert) every round, right after the
+  10th change, even in Connection priority mode. Switching a USB-C port off and on plays type 5
+  once 10 cycles fall within 60 s (Feature 2); 5 cycles in 10 s alone played nothing. After it
+  plays there is a cooldown: rounds 25 s, 1.5 min and 3 min later played nothing; rounds 5.4 min
+  apart (`--pause 300`) played it every time. The cloud's unlocked list didn't
+  change within a minute: the app reports new triggers there (`uploadEasterEggTrigger`,
+  `egg/add_easter_egg_trigger_record`), so it may need the app.
+- **Choosing a holiday**, **brightness
   below 20 %**: no command or endpoint (or no effect).

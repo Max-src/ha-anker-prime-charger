@@ -34,6 +34,9 @@ from .ports import (
 from .presets import ProtocolsPresetSelect, WeekdaysPresetSelect
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
+# Send the charger one command at a time
+PARALLEL_UPDATES = 1
+
 # usage_mode value of the custom charging mode
 CUSTOM_USAGE_MODE: Final = 5
 
@@ -200,11 +203,19 @@ class UsageModeSelect(OptionSelect):
         )
 
     async def async_select_option(self, option: str) -> None:
-        """Send a built-in mode, or apply a custom profile's port settings."""
+        """Send a built-in mode, or apply a custom profile's port settings.
+
+        Any mode change makes the charger restart every port (2-4 s without
+        power, also with the app), so the mode already active isn't sent
+        again. A custom profile always is: it restores the profile's saved
+        settings if they were changed since.
+        """
         if not (profile := self._profiles().get(option)):
+            if option == self.current_option:
+                return
             await super().async_select_option(option)
             return
-        await self.coordinator.async_set_custom_profile(profile.get("number"))
+        await self.coordinator.async_set_custom_profile(profile["number"])
 
 
 class PortPrioritySelect(PrimeChargerEntity, SelectEntity):
@@ -293,7 +304,7 @@ class ClockThemeSelect(PrimeChargerEntity, SelectEntity):
         self._attr_options = sorted(
             by_name,
             key=lambda name: (
-                themes.CATEGORY_ORDER.get(by_name[name].get("category_name"), 1),
+                themes.CATEGORY_ORDER.get(by_name[name].get("category_name") or "", 1),
                 name.lower(),
             ),
         )
@@ -326,6 +337,8 @@ class UsbAPowerLimit(PrimeChargerEntity, SelectEntity):
     Changing it switches the charger to the custom charging mode (see
     custom_mode.py).
     """
+
+    port: Port
 
     _attr_translation_key = "custom_power_limit"
     _attr_options = [str(watts) for watts in custom_mode.USB_A_OPTIONS]

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
+from homeassistant.helpers.device_registry import (
+    CONNECTION_BLUETOOTH,
+    CONNECTION_NETWORK_MAC,
+    ChildDeviceInfo,
+    DeviceInfo,
+    format_mac,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MANUFACTURER, MODEL, MODEL_NAME, SCREEN, SCREEN_LABEL
@@ -66,15 +72,29 @@ class PrimeChargerEntity(CoordinatorEntity[PrimeChargerCoordinator]):
 
 
 def charger_device_info(coordinator: PrimeChargerCoordinator) -> DeviceInfo:
-    """The charger's device."""
+    """The charger's device, with its Wi-Fi and Bluetooth addresses if known.
+
+    The addresses let Home Assistant match it with what other integrations
+    know of the same device (a router's, Bluetooth).
+    """
+    device = coordinator.device
+    connections = {
+        (kind, format_mac(str(mac)))
+        for kind, key in (
+            (CONNECTION_NETWORK_MAC, "wifi_mac"),
+            (CONNECTION_BLUETOOTH, "bt_ble_mac"),
+        )
+        if (mac := device.get(key))
+    }
     return DeviceInfo(
+        connections=connections,
         identifiers={(DOMAIN, coordinator.device_sn)},
         manufacturer=MANUFACTURER,
         model=MODEL_NAME,
         model_id=MODEL,
         name=coordinator.charger_name,
         serial_number=coordinator.device_sn,
-        sw_version=coordinator.device.get("sw_version") or None,
+        sw_version=device.get("sw_version") or None,
     )
 
 
