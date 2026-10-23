@@ -39,22 +39,6 @@ Assistant and the charger need internet access. You can continue using the Anker
 - Update the charger's firmware in the app, especially before using custom charging features.
 - Check [Compatibility](#compatibility) before installing for a different model.
 
-### HACS (recommended)
-
-[HACS](https://hacs.xyz/docs/use/download/download/) must already be installed in Home Assistant.
-
-1. Open **HACS** and search for **Anker Prime Charger**.
-2. Open the integration's page and select **Download**.
-3. Restart Home Assistant, then continue to [Setup](#setup).
-
-**Not listed in HACS yet?** Until this integration is included in the default HACS catalog,
-add it as a custom repository first:
-
-1. In HACS, open the **three-dot menu** and select **Custom repositories**.
-2. Enter `https://github.com/Max-src/ha-anker-prime-charger` as the repository URL.
-3. Select **Integration** as the type and click **Add**.
-4. Search for **Anker Prime Charger** and follow the download steps above.
-
 ### Manual installation
 
 The simplest way: download `anker_prime_charger.zip` from the
@@ -92,7 +76,7 @@ You do not need to copy the repository's tests, documentation or developer tools
 
 ### Updating
 
-Update through HACS, or replace the integration files manually using the same folder layout.
+Replace the integration files using the same folder layout.
 Restart Home Assistant afterwards to load the changes. You do not need to remove and re-add
 the integration for a normal update.
 
@@ -100,8 +84,7 @@ the integration for a normal update.
 
 1. Go to **Settings > Devices & services**, open **Anker Prime Charger**, and in the menu (⋮)
    of the charger's entry choose **Delete**. Its devices and entities are removed with it.
-2. To remove the files too: in HACS, open **Anker Prime Charger** and choose **Remove**; for a
-   manual install, delete the `custom_components/anker_prime_charger` folder.
+2. To remove the files too, delete the `custom_components/anker_prime_charger` folder.
 3. Restart Home Assistant.
 
 Nothing changes on the charger or in your Anker account: its settings, custom profiles and clock
@@ -128,16 +111,17 @@ disabling its MQTT connection to avoid competing sessions.
 Open the integration under **Settings > Devices & services** to find your charger and its ports.
 You can add their entities to dashboards or use them in automations.
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charger-device.png" alt="The charger's device page in Home Assistant" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/integration.png" alt="The integration's page: the charger and its port and Screen devices" width="700">
 
 The charger has six child devices: **USB-C 1**, **USB-C 2**, **USB-C 3**, **USB-C 4**, **USB-A**
 and **Screen**. Give the charger an area and leave the child devices' area empty: they follow
-the charger's. The Screen device holds the display settings, the clock screensaver and the
-hidden animations, named as in the charger's _Settings_ menu. The USB-A device contains
+the charger's. The Screen device holds the display settings, the clock screensaver, the page it
+shows (estimated) and the hidden animations, named as in the charger's _Settings_ menu. The USB-A device contains
 separate **A1** and **A2** readings, energy sensors and labels, but
 its on/off switch, timer, schedule and custom power limit control **both USB-A ports together**.
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-port-device.png" alt="A USB-C port's device page in Home Assistant">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/charger-device.png" alt="The charger's device page in Home Assistant" width="600">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/port-device.png" alt="A USB-C port's device page in Home Assistant" width="300">
 
 <details>
 <summary>All entities</summary>
@@ -150,7 +134,7 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile |
 | Priority ports                                                              | The one or two USB-C ports favoured in Connection priority mode                               |
 | Automatic deactivation                                                      | Custom mode: leave it when a port set to 0 W is used                                          |
-| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features                                                                       |
+| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features (the first and last are set on the charger, as the app does)          |
 | Fast updates                                                                | Readings every second for a while (see the options)                                           |
 | Refresh                                                                     | Ask for the status now and re-read the cloud settings                                         |
 
@@ -164,6 +148,7 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Clock theme                                          | Standard Style 1-3, Anker's stock themes and your own images (`Custom - <name>`)      |
 | Time display                                         | The time over a custom image (stock themes always show it)                            |
 | Holiday screensaver                                  | Festive themes on holidays, chosen by the charger (the guide's _Holiday Update_)      |
+| Page                                                 | What the screen shows: Power, Clock or Off (estimated, see below)                     |
 | Hidden animation, Unlocked animations                | Event when the screen plays a hidden animation; how many are unlocked                 |
 
 **Each port** (USB-C 1-4, and USB-A for both USB-A ports)
@@ -233,7 +218,7 @@ estimate but do not make it a calibrated energy measurement.
 
 Choose a mode using **Charging mode**:
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-charging-mode.png" alt="The Charging mode list with custom profiles">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/charging-mode.png" alt="The Charging mode list with custom profiles" width="260">
 
 | Mode                | Use it for                                                        |
 | ------------------- | ----------------------------------------------------------------- |
@@ -321,9 +306,8 @@ pick what it supports.
 
 ### Screen and clock
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-screen-device.png" alt="The charger's Screen device page in Home Assistant">
-
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-clock-theme.png" alt="Choosing a clock theme">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/screen-device.png" alt="The charger's Screen device page in Home Assistant" width="300">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/clock-theme.png" alt="Choosing a clock theme" width="260">
 
 Everything about the charger's screen is on its **Screen** device. Choose a **Clock theme**,
 turn on **Clock screensaver**, and optionally set its start time, end time and days.
@@ -332,6 +316,14 @@ too.
 
 The clock screensaver shows when the screen times out, so **Timeout** must not be **Always on**,
 and the screen must not have been turned off using the knob.
+
+**Page** tells what the screen shows: **Power** (the power page), **Clock** or **Off**. The
+charger doesn't report it, so it is estimated, from what was tried at the charger: the screen
+wakes on the power page when a device is plugged in or out and with every command from Home
+Assistant (except a clock theme change, or turning **Clock screensaver** on or off), and stays on
+for the **Timeout**. Then it shows the clock if **Clock screensaver** is on and it is within its
+hours and days, otherwise it goes dark. Turning the knob wakes it too, which Home Assistant can't
+see: then **Page** says Clock or Off while the power page shows, until the Timeout.
 
 Your own clock images appear as `Custom - <name>` in **Clock theme**. Add, rename and delete
 them with the [clock image actions](#automations) (or in the Anker app: they show here after
@@ -343,18 +335,18 @@ there is no command to start one, also not in the app (which plays its own copy 
 **Hidden animation** fires an event each time one plays (attribute `animation_type`), and
 **Unlocked animations** counts those you have unlocked. How to trigger them, from the app's hints:
 
-| Animation (app name) | How                                                                        |
-| -------------------- | -------------------------------------------------------------------------- |
+| Animation (app name) | How                                                                         |
+| -------------------- | --------------------------------------------------------------------------- |
 | Feature 1            | Switch the charger's main screen 20 times within 10 seconds (with the knob) |
-| Feature 2            | Plug and unplug a device on the same USB-C port 10 times within 60 seconds |
-| Dizziness            | Plug and unplug on the same USB-C port 5 times within 10 seconds           |
-| Play bad             | Switch the main screen 15 times within 10 seconds                          |
-| Device Expert        | Have a device connected to every port at the same time                     |
-| Feature Expert       | Change the port priority 10 times                                          |
-| Power Expert         | Connect 3 high-performance laptops at the same time                        |
+| Feature 2            | Plug and unplug a device on the same USB-C port 10 times within 60 seconds  |
+| Dizziness            | Plug and unplug on the same USB-C port 5 times within 10 seconds            |
+| Play bad             | Switch the main screen 15 times within 10 seconds                           |
+| Device Expert        | Have a device connected to every port at the same time                      |
+| Feature Expert       | Change the port priority 10 times                                           |
+| Power Expert         | Connect 3 high-performance laptops at the same time                         |
 
 The first four play each time; the last three are achievements, unlocked once (listed in the
-app's *Secret Features*).
+app's _Secret Features_).
 
 Home Assistant can trigger two of them, but both interrupt charging, so they are a curiosity
 rather than something to automate:
@@ -366,7 +358,7 @@ rather than something to automate:
   It power-cycles the device on that port, and after playing the charger ignores it for 3 to 5
   minutes.
 
-The others need you at the charger. **Unlocked animations** (and the app's *Secret Features*)
+The others need you at the charger. **Unlocked animations** (and the app's _Secret Features_)
 only list what the Anker app recorded: the app records an animation when it is connected to
 the charger while it plays, so an animation played with the app closed isn't added.
 
@@ -375,23 +367,28 @@ the charger while it plays, so an animation played with the app closed isn't add
 The integration comes with two cards that show the charger as the Anker app does. They are
 loaded automatically: nothing to install or add under **Resources**.
 
-| Card                                 | Shows                                                                                    |
-| ------------------------------------ | ---------------------------------------------------------------------------------------- |
-| **Anker Prime Charger 3D**           | The charger in 3D, with a cable in each port in use and the total output on its screen; drag it to turn it |
-| **Anker Prime Charger outputs**      | _USB-C Output_ and _USB-A Output_: each port's power, voltage and current; tap a port for its power history |
+| Card                            | Shows                                                                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Anker Prime Charger 3D**      | The charger in 3D: the ports in use (with their cables and power) and what its screen shows; drag it to turn it, zoom in and out |
+| **Anker Prime Charger outputs** | _USB-C Output_ and _USB-A Output_: each port's power, voltage and current; tap a port for its power history                      |
 
 To add one, edit a dashboard, choose **Add card**, and search for **Anker**. The visual editor
 lets you choose the **Charger** (the first one is preselected), for the outputs card whether to
 **Show voltage and current**, and for the 3D card whether to **Rotate by dragging** (on by
-default; off, the charger stays as it is shown) and to **Show the clock screensaver**: its screen
-then shows the charger's selected clock theme with the current time (as the charger shows it:
-always on stock themes, on your images when **Time display** is on), instead of the total output.
-It is drawn whether or not the charger shows its screensaver at that moment, which the charger
-doesn't report. The three Standard Styles are drawn in their spirit, not copied.
+default; off, the charger stays as it is shown), whether to **Show plugged-in cables** (on by
+default; off, the ports with a device are only lit), whether to **Show each port's power** (on by
+default: above each USB-C port with a device, as the charger's power page shows it, and on the
+side above each USB-A port; whatever the screen shows) and what **The screen shows**: **Auto**
+(the default: what the charger shows, as its [**Page**](#screen-and-clock) sensor estimates it),
+**Power** (the total output), **Clock** (the charger's selected clock theme with the current
+time, as the charger shows it: always on stock themes, on your images when **Time display** is
+on) or **Off**. The three Standard Styles are drawn in their spirit, not copied.
 
 To turn the 3D card, drag it (on a touch screen, sideways: scrolling up and down still scrolls the
-page), or click it and use the arrow keys. Double-click (or **Home**) goes back to the default
-view. Each card remembers its view for your Home Assistant user, so the charger is shown as you
+page), or click it and use the arrow keys. To zoom, use **Ctrl** + the mouse wheel (or pinch on a
+touchpad or touch screen), or **+** and **-**; the mouse wheel alone still scrolls the page.
+Double-click (or **Home**) goes back to the default view. Each card remembers its view (angle and
+zoom) for your Home Assistant user, so the charger is shown as you
 left it the next time, also on your other devices. (A 3D card from an earlier version gets its own
 view once opened and saved in the editor; until then it shares its charger's.) While the charger
 is offline, the 3D card is greyed out.
@@ -399,12 +396,13 @@ is offline, the 3D card is greyed out.
 In the outputs card, a port's label is coloured while a device is plugged in; ports without a
 device show `--`.
 
-**Anker Prime Charger 3D** (the screenshots are generated, see
-[docs/DOCUMENTATION_SCREENSHOTS.md](docs/DOCUMENTATION_SCREENSHOTS.md)):
+**Anker Prime Charger 3D** (the screenshots are generated, like those of Home Assistant's pages
+above, see [docs/DOCUMENTATION_SCREENSHOTS.md](docs/DOCUMENTATION_SCREENSHOTS.md)):
+
 <!-- card-docs:3d:variations:start -->
 <table>
   <tr>
-    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-overview.png" alt="Anker Prime Charger 3D: Three devices charging" width="280"><br>Three devices charging</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-overview.png" alt="Anker Prime Charger 3D: Three devices charging: the power page" width="280"><br>Three devices charging: the power page</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-all-ports.png" alt="Anker Prime Charger 3D: Every port in use" width="280"><br>Every port in use</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-turned.png" alt="Anker Prime Charger 3D: Turned by dragging: the right side and the back" width="280"><br>Turned by dragging: the right side and the back</td>
   </tr>
@@ -415,10 +413,11 @@ device show `--`.
   </tr>
   <tr>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-image.png" alt="Anker Prime Charger 3D: Clock screensaver: an image, with the time (12h)" width="280"><br>Clock screensaver: an image, with the time (12h)</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screen-off.png" alt="Anker Prime Charger 3D: The screen off" width="280"><br>The screen off</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-dark.png" alt="Anker Prime Charger 3D: Dark theme" width="280"><br>Dark theme</td>
-    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-offline.png" alt="Anker Prime Charger 3D: The charger offline" width="280"><br>The charger offline</td>
   </tr>
   <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-offline.png" alt="Anker Prime Charger 3D: The charger offline" width="280"><br>The charger offline</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-narrow.png" alt="Anker Prime Charger 3D: A narrow column (a phone)" width="280"><br>A narrow column (a phone)</td>
   </tr>
 </table>
@@ -461,7 +460,9 @@ Its visual editor:
 type: custom:anker-prime-charger-3d-card
 device: 0123456789abcdef0123456789abcdef # optional: the charger's device id
 drag_to_rotate: true # turn it by dragging; its view is remembered (default true)
-show_screensaver: false # its screen shows the clock screensaver (default false)
+screen: auto # what its screen shows: auto (default), power, clock or off
+show_port_power: true # each port's power above it (default true)
+show_cables: true # a cable in each port with a device (default true)
 view_id: k3x9q2 # set by the editor: the card's own saved view
 ```
 
@@ -504,7 +505,7 @@ too: the action applies to the devices in it that it suits (e.g. a profile actio
 **Set protocols** to its USB-C ports). Set an area on the charger only: its port and Screen devices follow it as long as they have no area of their own (leave theirs empty). Labels are not inherited: label each device. Saving a profile does **not**
 apply it. Select the profile in **Charging mode** to activate it.
 
-<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/screenshot-set-custom-settings.png" alt="The Set custom settings action in the action editor" width="700">
+<img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/pages/set-custom-settings.png" alt="The Set custom settings action in the action editor" width="700">
 
 <details>
 <summary>Action examples and custom settings</summary>
@@ -596,7 +597,7 @@ data:
   protocols: [scp, ufcs, pps16v]
 ```
 
-Add your own clock image. Pick it in **Image** from *Media > My media* (upload it there first), or
+Add your own clock image. Pick it in **Image** from _Media > My media_ (upload it there first), or
 give a `path` Home Assistant may read (e.g. in `/config/www` or `/media`). It is cut to the
 screen's 480 x 200: `fit: fill` crops it to fill the screen, `fit: fit` keeps the whole image
 with black bars. `frame: shade` darkens the image and shades its edges, like the Anker app
@@ -617,7 +618,7 @@ response_variable: added
 ```
 
 Rename or delete an image by its name, its **Clock theme** option or its id. Deleting the image
-on the screen first switches the charger to *Standard Style - Theme 1*:
+on the screen first switches the charger to _Standard Style - Theme 1_:
 
 ```yaml
 action: anker_prime_charger.rename_clock_image
@@ -686,26 +687,26 @@ for hardware limits and charging-mode details.
 - **Energy is estimated** from the power readings; the charger doesn't count energy itself.
 - **Not available from the cloud:** renaming the charger (Home Assistant only), choosing a
   holiday theme, brightness below 20 % (no visible effect), and starting a hidden animation on
-  demand (see *Screen and clock*).
+  demand (see _Screen and clock_).
 - **Other models** aren't supported yet; Bluetooth-only ones can't be (see
   [Compatibility](#compatibility)).
 
 ## Troubleshooting
 
-| Problem                                               | What to check                                                                                                          |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Integration does not appear                           | Restart Home Assistant after installation. For a manual install, check the folder layout above and refresh the browser |
-| Charger is not found                                  | Confirm it is an A2345, online in the Anker app, and owned by the account you used to sign in                          |
-| Repair: the charger is no longer in your Anker account | It was removed from the account or moved to another one. Add it back in the Anker app, or delete the integration's entry |
-| Repair: the charger is offline                        | No status for an hour: check its power and 2.4 GHz Wi-Fi in the Anker app, and Home Assistant's internet access      |
-| Entities are unavailable                              | Check charger power, Wi-Fi and internet access. Readings return when the charger answers again                         |
-| App settings have not appeared                        | Use **Refresh**, or wait for the 10-minute cloud-settings refresh                                                      |
-| App and Home Assistant power readings differ          | They can sample at different times; charging power changes with device demand                                          |
-| Custom profiles are missing                           | Enable the **Custom charging mode** test feature and check for firmware updates                                        |
+| Problem                                                       | What to check                                                                                                                    |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Integration does not appear                                   | Restart Home Assistant after installation. For a manual install, check the folder layout above and refresh the browser           |
+| Charger is not found                                          | Confirm it is an A2345, online in the Anker app, and owned by the account you used to sign in                                    |
+| Repair: the charger is no longer in your Anker account        | It was removed from the account or moved to another one. Add it back in the Anker app, or delete the integration's entry         |
+| Repair: the charger is offline                                | No status for an hour: check its power and 2.4 GHz Wi-Fi in the Anker app, and Home Assistant's internet access                  |
+| Entities are unavailable                                      | Check charger power, Wi-Fi and internet access. Readings return when the charger answers again                                   |
+| App settings have not appeared                                | Use **Refresh**, or wait for the 10-minute cloud-settings refresh                                                                |
+| App and Home Assistant power readings differ                  | They can sample at different times; charging power changes with device demand                                                    |
+| Custom profiles are missing                                   | Enable the **Custom charging mode** test feature and check for firmware updates                                                  |
 | Charging briefly stops after changing mode or custom settings | The charger restarts all ports to apply a new power split (also with the app). Use **Set custom settings** for a combined change |
-| USB-A ports switch together                           | This is a charger limitation; their power and energy readings are still separate                                       |
-| Clock screen is not shown                             | On the Screen device: check **Clock screensaver**, its schedule, and that **Timeout** is not _Always on_               |
-| A port does not reach its maximum power               | Check the charging mode, cable and device capabilities. Only USB-C 1 supports 140 W; charging slows as batteries fill  |
+| USB-A ports switch together                                   | This is a charger limitation; their power and energy readings are still separate                                                 |
+| Clock screen is not shown                                     | On the Screen device: check **Clock screensaver**, its schedule, and that **Timeout** is not _Always on_                         |
+| A port does not reach its maximum power                       | Check the charging mode, cable and device capabilities. Only USB-C 1 supports 140 W; charging slows as batteries fill            |
 
 For a bug report, [open an issue](https://github.com/Max-src/ha-anker-prime-charger/issues)
 with your charger model, Home Assistant version and steps to reproduce the problem. Download
@@ -754,8 +755,7 @@ library by thomluther. A copy is bundled with the integration, so no separate li
 is required.
 
 For contributing or investigating other models, see [Development](docs/DEVELOPMENT.md) and
-the [protocol notes](docs/PROTOCOL.md). The [tools](tools) folder contains optional developer
-scripts for investigating the charger's cloud and MQTT behavior; it is not required for installation.
+the [protocol notes](docs/PROTOCOL.md).
 
 ## License
 

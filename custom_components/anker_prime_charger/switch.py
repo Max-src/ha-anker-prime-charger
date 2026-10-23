@@ -18,8 +18,14 @@ from . import custom_mode, schedules, themes
 from .const import TEST_FEATURES
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import is_on, on_off
-from .mqtt_extensions import TIME_DISPLAY_COMMAND, TIME_DISPLAY_STATE
+from .helpers import is_on, on_off, to_int
+from .mqtt_extensions import (
+    CUSTOM_MODE_COMMAND,
+    CUSTOM_MODE_PARAMETER,
+    TEST_FEATURE_COMMANDS,
+    TIME_DISPLAY_COMMAND,
+    TIME_DISPLAY_STATE,
+)
 from .ports import PORTS, Port
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
@@ -189,7 +195,14 @@ class AutoDeactivationSwitch(ReportedSwitch):
 
 
 class TestFeatureSwitch(ReportedSwitch):
-    """One of the app's test features, stored in the Anker cloud."""
+    """One of the app's test features, as the app changes it.
+
+    Maximum compatibility and charging device identification are held by the
+    charger: a command changes them (then the cloud flag, for the app), and
+    the charger's status tells their state; the cloud flag only until the
+    charger reports it (it can disagree). Custom charging mode lives in the
+    cloud; turning it off also tells the charger (see mqtt_extensions.py).
+    """
 
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -197,14 +210,27 @@ class TestFeatureSwitch(ReportedSwitch):
         """Initialize."""
         super().__init__(coordinator, key)
         self._attr_translation_key = key
+        self._command = TEST_FEATURE_COMMANDS.get(key)
 
     @property
     def mqtt_value(self) -> Any:
-        """Return the flag from the cloud settings (not an MQTT value)."""
+        """Return 1 when on: as the charger reports it, else the cloud flag."""
+        if self._command:
+            _, _, state, means_off = self._command
+            reported = to_int((self.coordinator.data or {}).get(state))
+            if reported is not None:
+                return 1 - reported if means_off else reported
         return self.coordinator.cloud.device_settings.get(self.key)
 
     async def _async_set(self, on: bool) -> None:
+        if self._command:
+            command, parameter, _, _ = self._command
+            await self.coordinator.async_send_command(command, on_off(on), parameter)
         await self.coordinator.async_set_test_feature(self.key, on)
+        if self.key == "charging_mode_status" and not on:
+            await self.coordinator.async_send_command(
+                CUSTOM_MODE_COMMAND, on_off(False), CUSTOM_MODE_PARAMETER
+            )
 
 
 class FastUpdatesSwitch(PrimeChargerEntity, SwitchEntity):

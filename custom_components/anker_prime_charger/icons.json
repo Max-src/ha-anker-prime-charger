@@ -76,6 +76,14 @@
     "sensor": {
       "unlocked_animations": {
         "default": "mdi:trophy"
+      },
+      "screen_page": {
+        "default": "mdi:monitor",
+        "state": {
+          "power": "mdi:flash",
+          "clock": "mdi:clock-outline",
+          "off": "mdi:monitor-off"
+        }
       }
     },
     "switch": {

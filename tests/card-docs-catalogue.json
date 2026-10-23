@@ -4,7 +4,7 @@
     "element": "anker-prime-charger-3d-card",
     "variations": {
       "overview": {
-        "title": "Three devices charging"
+        "title": "Three devices charging: the power page"
       },
       "all-ports": {
         "title": "Every port in use",
@@ -51,7 +51,7 @@
       "screensaver-flip": {
         "title": "Clock screensaver: Standard Style 1",
         "config": {
-          "show_screensaver": true
+          "screen": "clock"
         },
         "screensaver": {
           "kind": "style_1"
@@ -60,7 +60,7 @@
       "screensaver-digits": {
         "title": "Clock screensaver: Standard Style 2",
         "config": {
-          "show_screensaver": true
+          "screen": "clock"
         },
         "screensaver": {
           "kind": "style_2"
@@ -69,7 +69,7 @@
       "screensaver-ring": {
         "title": "Clock screensaver: Standard Style 3",
         "config": {
-          "show_screensaver": true
+          "screen": "clock"
         },
         "screensaver": {
           "kind": "style_3"
@@ -78,12 +78,18 @@
       "screensaver-image": {
         "title": "Clock screensaver: an image, with the time (12h)",
         "config": {
-          "show_screensaver": true
+          "screen": "clock"
         },
         "screensaver": {
           "kind": "custom",
           "time_display": true,
           "clock_format": "12h"
+        }
+      },
+      "screen-off": {
+        "title": "The screen off",
+        "config": {
+          "screen": "off"
         }
       },
       "dark": {

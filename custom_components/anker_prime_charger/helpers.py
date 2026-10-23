@@ -7,6 +7,7 @@ and reports weekdays either as a bitmask or as a list of day names.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from datetime import time
 from typing import Any, Final
 
 from homeassistant.exceptions import HomeAssistantError
@@ -69,3 +70,15 @@ def to_weekdays(value: Any) -> list[str] | None:
     if (mask := to_int(value)) is None:
         return None
     return [day for idx, day in enumerate(WEEKDAYS) if mask & (1 << idx)]
+
+
+def reported_time(data: dict[str, Any], prefix: str) -> time | None:
+    """A time the charger reports as <prefix>_hour and <prefix>_minute."""
+    hour = to_int(data.get(f"{prefix}_hour"))
+    minute = to_int(data.get(f"{prefix}_minute"))
+    if hour is None or minute is None:
+        return None
+    try:
+        return time(hour, minute)
+    except ValueError:
+        return None

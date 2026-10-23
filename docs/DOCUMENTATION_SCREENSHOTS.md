@@ -1,8 +1,18 @@
 # Documentation screenshots
 
-The screenshots of the dashboard cards in the README (`images/cards/`) are generated, so they
-always show the cards as they are. Nothing else in the README is: the prose, tables and YAML are
-written by hand. Automation only replaces the galleries between a card's markers,
+The README's screenshots are generated, so they show the integration as it is:
+
+- **the dashboard cards** (`images/cards/`), with a synthetic charger, in CI: most of this page;
+- **Home Assistant's pages for the charger** (`images/pages/`): the integration, the charger's,
+  a port's and the Screen's device pages, the clock theme and charging mode lists, and the Set
+  custom settings action, from a real charger, on your computer (see
+  [Home Assistant's pages](#home-assistants-pages)).
+
+Only the Energy dashboard's (`images/screenshot-energy-dashboard.png`) is taken by hand: it shows
+whatever else that Home Assistant's Energy settings hold. The prose, tables and YAML are written
+by hand too. `npm test` also checks that every file the documentation links to exists.
+
+For the cards, automation only replaces the galleries between a card's markers,
 
 ```
 <!-- card-docs:3d:variations:start --> ... <!-- card-docs:3d:variations:end -->
@@ -16,7 +26,7 @@ and fails on missing, duplicate or reversed markers.
 (`3d`, `outputs`), its **variations** (a scenario each) and **editors** (the visual editor). A
 scenario has a `title` (the caption) and may set `ports` (the readings `[W, V, A]` of each port
 with a device; the default is C1, C2 and A2 in use), `offline`, `dark` (Home Assistant's dark
-theme), `width` (the column, default 420 px), `config` (the card's options) and, for the 3D card,
+theme), `width` (the column, default 420 px), `config` (the card's options, e.g. `{"screen": "clock"}`) and, for the 3D card,
 `view` (`{yaw, pitch}`, as if turned by dragging) and `screensaver` (the selected theme: `kind`
 `style_1` to `style_3`, `stock` or `custom`, with our own picture; `time_display`;
 `clock_format` `12h` or `24h`). The clock always shows Wednesday 14 January 2026, 08:40. Add a scenario there: its image and caption
@@ -86,3 +96,31 @@ stay available as artifacts.
 
 When a scenario is removed from the catalogue, delete its image in the same change: unrelated
 images are never deleted automatically.
+
+## Home Assistant's pages
+
+These need the real integration and a charger (Anker's cloud), which CI doesn't have, so they
+are captured from your own Home Assistant: run it after adding, renaming or removing entities,
+or when Home Assistant's pages change. In PowerShell:
+
+```powershell
+$env:DOCS_HA_URL = 'http://homeassistant.local:8123'
+$env:DOCS_HA_TOKEN = Get-Content C:\Users\me\.ha_token
+npm run docs:pages
+```
+
+[tests/ha-docs.cjs](../tests/ha-docs.cjs) lists the images and what each shows; `DOCS_FILTER`
+keeps the matching ones. Each is captured in a fresh browser in Home Assistant's default light
+theme, whatever your profile's, and written to `images/pages/`. Nothing is changed in Home
+Assistant: pages are opened, a list opened by clicking, and the actions page filled through that
+browser's storage only.
+
+What identifies your charger is replaced on the page before each capture: its serial number,
+Wi-Fi and Bluetooth addresses, and the device and config entry ids (as `ASHV911G00000001`,
+`AA:BB:CC:DD:EE:01`, `AA:BB:CC:DD:EE:02` and `0123456789abcdef0123456789abcdef`). An image still
+showing one of them is not written. Everything else is your charger as it is: its readings,
+settings, profile names, port labels and the area of its devices, so look at the images before
+committing them.
+
+When Home Assistant's pages change, a selector may no longer match: that image is reported as
+not captured (the run fails) and its committed version stays.

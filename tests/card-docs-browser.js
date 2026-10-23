@@ -98,11 +98,17 @@ window.cardDocs = (() => {
           case "anker_prime_charger/screensaver": {
             const kind = scenario.screensaver?.kind || "style_2";
             const picture = kind === "stock" || kind === "custom";
-            return { kind, name: kind, image_url: picture ? PICTURE : null };
+            return { kind, name: kind, image_key: picture ? `${kind}:docs` : null };
           }
           default:
             throw Error(`Unexpected websocket command: ${message.type}`);
         }
+      },
+      /** The screensaver's picture (screensaver-store.js asks for it). */
+      async fetchWithAuth() {
+        const kind = scenario.screensaver?.kind || "style_2";
+        const blob = await (await fetch(PICTURE)).blob();
+        return new Response(blob, { headers: { "X-Image-Key": `${kind}:docs` } });
       },
       callService() {
         throw Error("The documentation fixture calls no service");

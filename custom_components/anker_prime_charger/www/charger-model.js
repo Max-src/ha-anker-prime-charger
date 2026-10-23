@@ -28,7 +28,9 @@ const CORNER_STEPS = 5;
 // The front: glass, screen text, USB-C ports (2D: u right, v down, mm)
 const GLASS = { inset: 6, radius: 6 };
 const USB_C = { ids: ["c1", "c2", "c3", "c4"], gap: 35, v: H - 12, width: 20, height: 5.5 };
-const SCREEN_TEXT = { v: H * 0.4 };
+// The power page: the total output; each USB-C port's power, just above it
+// (whatever the screen shows; the USB-A ports': SIDE_POWER)
+const POWER_PAGE = { total: H * 0.36, port: H - 21 };
 // The display under the glass (2.4:1, as its 480 x 200 pixels), above the
 // ports: where the clock screensaver is drawn
 const DISPLAY = { width: 84, height: 35, v: 9 };
@@ -36,6 +38,8 @@ DISPLAY.u = (W - DISPLAY.width) / 2;
 // The right side (2D: u from the front edge to the back, v down)
 const KNOB = { u: 25, v: H * 0.55, radius: 11, height: 6 };
 const USB_A = { ids: ["a1", "a2"], u: [67, 104], v: H * 0.55, width: 22, height: 9 };
+// Each USB-A port's power, on the side just above it
+const SIDE_POWER = { v: USB_A.v - 13 };
 // Plugs: their size around the port, length, narrowing; cords
 // Plugs (like Apple's braided cables): a soft white housing with rounded
 // edges, out of a thin metal collar; its size around the port, length,
@@ -54,7 +58,14 @@ const CORD = { width: 6.5, reach: 85 };
 
 // The view (SVG units: mm at the model's centre), the camera's distance from
 // the centre (smaller: stronger perspective), the light (view space: top left)
-const VIEW_BOX = "-180 -110 360 220";
+const VIEW_BOX = { width: 360, height: 220 };
+
+/** The view box at `zoom` (1: the whole charger; larger: nearer), centred. */
+function viewBox(zoom) {
+  const width = VIEW_BOX.width / zoom;
+  const height = VIEW_BOX.height / zoom;
+  return `${-width / 2} ${-height / 2} ${width} ${height}`;
+}
 const CAMERA_DISTANCE = 650;
 const LIGHT = normalize([-0.45, 0.75, 0.55]);
 
@@ -215,8 +226,10 @@ function face(view, s, details) {
 
 /** A port's opening on a surface, centred at (u, v). */
 function port(view, s, u, v, width, height, radius, active) {
+  // on the side's metal (not the front's glass): a dark rim
+  const classes = ["port", active ? "active" : "", s === RIGHT ? "side" : ""];
   return svg`<rect
-    class=${active ? "port active" : "port"}
+    class=${classes.join(" ")}
     transform=${placement(view, s, u, v)}
     x=${u - width / 2} y=${v - height / 2} width=${width} height=${height} rx=${radius}
   />`;
@@ -231,7 +244,28 @@ function display(view, content) {
   </g>`;
 }
 
-function frontFace(view, inUse, screen, screensaver) {
+/** Text on the front, centred at (u, v). */
+function frontText(view, cls, u, v, value) {
+  return svg`<text class=${cls} transform=${placement(view, FRONT, u, v)} x=${u} y=${v}>${value}</text>`;
+}
+
+/** What the screen shows (see chargerModel's `screen`), drawn on the glass. */
+function screenContent(view, screen) {
+  if (screen.mode === "clock") return display(view, screen.content);
+  if (screen.mode === "off") return "";
+  return frontText(view, "screen", W / 2, POWER_PAGE.total, screen.total);
+}
+
+/** Each USB-C port's power, just above it (over the screen). */
+function usbCPower(view, portPower) {
+  return USB_C.ids.map((id, i) =>
+    portPower?.[id]
+      ? frontText(view, "port-power", W / 2 + (i - 1.5) * USB_C.gap, POWER_PAGE.port, portPower[id])
+      : "",
+  );
+}
+
+function frontFace(view, inUse, screen, portPower) {
   const glass = roundedRect(
     GLASS.inset,
     GLASS.inset - 1,
@@ -244,15 +278,14 @@ function frontFace(view, inUse, screen, screensaver) {
   );
   return face(view, FRONT, svg`
     <polygon class="glass" points=${view.screen(glass)} fill=${COLOURS.glass} />
-    ${screensaver ? display(view, screensaver) : svg`<text class="screen"
-      transform=${placement(view, FRONT, W / 2, SCREEN_TEXT.v)}
-      x=${W / 2} y=${SCREEN_TEXT.v}>${screen}</text>`}
+    ${screenContent(view, screen)}
+    ${usbCPower(view, portPower)}
     ${ports}
   `);
 }
 
 /** The right side's details (its surface is one of the body's strips). */
-function rightDetails(view, inUse) {
+function rightDetails(view, inUse, portPower) {
   const middle = at(RIGHT, D / 2, H / 2);
   if (!view.facing(RIGHT.normal, middle)) return null;
   // the knob: discs stacked out from the side (its edge), then its top
@@ -270,10 +303,17 @@ function rightDetails(view, inUse) {
   const ports = USB_A.ids.map((id, i) =>
     port(view, RIGHT, USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, 0.8, inUse.has(id)),
   );
+  const power = USB_A.ids.map((id, i) => {
+    const value = portPower?.[id];
+    if (!value) return "";
+    const u = USB_A.u[i];
+    return svg`<text class="side-power" transform=${placement(view, RIGHT, u, SIDE_POWER.v)}
+      x=${u} y=${SIDE_POWER.v}>${value}</text>`;
+  });
   return {
     // just in front of the side, so drawn over it
     depth: view.project(middle)[2] + 0.01,
-    draw: svg`${ports}${knob}`,
+    draw: svg`${ports}${power}${knob}`,
   };
 }
 
@@ -399,32 +439,36 @@ function cable(view, s, kind, u, v, width, height, spread) {
 
 /**
  * The charger seen from (yaw, pitch), in degrees. `inUse`: the ids of the
- * ports with a device ("c1" ... "a2"); `screen`: the text on its screen, or
- * `screensaver`: what its display shows instead (charger-screensaver.js: an
- * SVG drawing in the display's 480 x 200 coordinates).
+ * ports with a device ("c1" ... "a2"); `screen`: what its screen shows,
+ * {mode: "power", total: "12.6 W"} (the power page), {mode: "clock",
+ * content} (charger-screensaver.js: an SVG drawing in the display's
+ * 480 x 200 coordinates) or {mode: "off"}; `portPower`: each port's power
+ * written above it ({c1: "7.2W", a1: "2.5W"}), whatever the screen shows
+ * (none: not written); `zoom`: 1 shows the whole charger, larger is nearer;
+ * `cables`: a cable in each port in use (else only the port is lit).
  */
-export function chargerModel({ yaw, pitch, inUse, screen, screensaver }) {
+export function chargerModel({ yaw, pitch, zoom = 1, inUse, screen, portPower, cables = true }) {
   const view = viewer(yaw, pitch);
   const items = [
     ...bodySides(view),
-    frontFace(view, inUse, screen, screensaver),
+    frontFace(view, inUse, screen, portPower),
     face(view, BACK, ""),
-    rightDetails(view, inUse),
+    rightDetails(view, inUse, portPower),
   ];
   USB_C.ids.forEach((id, i) => {
-    if (!inUse.has(id)) return;
+    if (!cables || !inUse.has(id)) return;
     const u = W / 2 + (i - 1.5) * USB_C.gap;
     // the cords fan out a little, as when they lie on a desk
     const spread = [(i - 1.5) * 18, 0, 0];
     items.push(cable(view, FRONT, "usb_c", u, USB_C.v, USB_C.width, USB_C.height, spread));
   });
   USB_A.ids.forEach((id, i) => {
-    if (!inUse.has(id)) return;
+    if (!cables || !inUse.has(id)) return;
     const spread = [0, 0, (0.5 - i) * 20];
     items.push(cable(view, RIGHT, "usb_a", USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, spread));
   });
   const drawn = items.filter(Boolean).sort((a, b) => a.depth - b.depth);
-  return svg`<svg viewBox=${VIEW_BOX} xmlns="http://www.w3.org/2000/svg" role="img">
+  return svg`<svg viewBox=${viewBox(zoom)} xmlns="http://www.w3.org/2000/svg" role="img">
     <defs>
       <radialGradient id="knob-top" cx="0.4" cy="0.35" r="0.75">
         <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
@@ -444,15 +488,40 @@ export const modelStyles = css`
   }
   .screen {
     fill: var(--anker-port-active-color);
-    font: 600 15px var(--ha-font-family-body, Roboto, sans-serif);
+    font: 600 22px var(--ha-font-family-body, Roboto, sans-serif);
     text-anchor: middle;
     dominant-baseline: middle;
   }
+  .port-power {
+    fill: #e8edf2;
+    /* readable over the clock's picture too */
+    stroke: #0b0e12;
+    stroke-width: 1.6px;
+    stroke-linejoin: round;
+    paint-order: stroke;
+    font: 600 8.5px var(--ha-font-family-body, Roboto, sans-serif);
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+  .side-power {
+    fill: #2f353c;
+    font: 600 8.5px var(--ha-font-family-body, Roboto, sans-serif);
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+  /* a port's opening, with a thin rim (metal on the glass, dark on the side's
+     metal; on a lit port, its colour darker) */
   .port {
     fill: #30363d;
+    stroke: #8b949d;
+    stroke-width: 0.7px;
+  }
+  .port.side {
+    stroke: #121519;
   }
   .port.active {
     fill: var(--anker-port-active-color);
+    stroke: color-mix(in srgb, var(--anker-port-active-color) 55%, #0b0e12);
   }
   /* the braided cord: outline, cord, then two rows of dashes, staggered */
   .cord,

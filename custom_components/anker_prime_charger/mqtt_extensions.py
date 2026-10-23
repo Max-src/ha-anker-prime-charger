@@ -18,6 +18,12 @@ to the library's model map at runtime, so the vendored files stay unchanged.
 - Hidden ("easter egg") animations: the charger reports each one it plays in
   message 0305, field a2 = animation type (e.g. 5 after unplugging a port 10
   times within 60 s). There is no command to play one.
+- The app's test features (captured 2026-10-22, docs/PROTOCOL.md): the
+  charger holds two of them, which a change of the cloud flag alone doesn't
+  reach. Maximum compatibility: command 0214, field a2: 0 on, 1 off; reported
+  in 0a00 field bb (0 on, 1 off). Charging device identification: command
+  0223, field a2: 1 on, 0 off; reported in 0a00 field bf. Custom charging
+  mode is turned on in the cloud only; turning it off also sends 0211, a2 0.
 
 Tried and dropped: display brightness below the app's 20 % (the charger
 accepts the command but the screen doesn't get darker).
@@ -48,9 +54,36 @@ from .solixapi.mqttmap import SOLIXMQTTMAP
 TIME_DISPLAY_COMMAND: Final = "time_display_switch"
 TIME_DISPLAY_STATE: Final = "time_display"
 
+# Test features held by the charger (cloud flag key -> command and state)
+COMPATIBILITY_COMMAND: Final = "compatibility_switch"
+COMPATIBILITY_OFF_STATE: Final = "compatibility_off"  # 0 on, 1 off
+IDENTIFICATION_COMMAND: Final = "device_identification_switch"
+IDENTIFICATION_STATE: Final = "device_identification"
+CUSTOM_MODE_COMMAND: Final = "custom_charging_mode_switch"
+CUSTOM_MODE_PARAMETER: Final = "set_custom_charging_mode"
+# cloud flag -> (command, its parameter, reported state, whether the state's 1 means off)
+TEST_FEATURE_COMMANDS: Final = {
+    "compatibility_status": (
+        COMPATIBILITY_COMMAND,
+        "set_compatibility",
+        COMPATIBILITY_OFF_STATE,
+        True,
+    ),
+    "charging_device_identity_status": (
+        IDENTIFICATION_COMMAND,
+        "set_device_identification",
+        IDENTIFICATION_STATE,
+        False,
+    ),
+}
+
 # Decoded values the library's cache update drops because it doesn't know
 # them; the coordinator stores these itself (see _async_mqtt_message).
-EXTRA_STATE_KEYS: Final = (TIME_DISPLAY_STATE,)
+EXTRA_STATE_KEYS: Final = (
+    TIME_DISPLAY_STATE,
+    COMPATIBILITY_OFF_STATE,
+    IDENTIFICATION_STATE,
+)
 
 EASTER_EGG_STATE: Final = "easter_egg_type"
 
@@ -74,8 +107,46 @@ def _theme_kind_field(field: dict[str, Any], default: int) -> dict[str, Any]:
     return field | {BYTES: field[BYTES] | {"00": bits}}
 
 
+def _switch_command(
+    command: str, parameter: str, options: dict[str, int], state: str | None
+) -> dict[str, Any]:
+    """An on/off command with one field (a2), and the state it changes."""
+    field: dict[str, Any] = {
+        NAME: parameter,
+        TYPE: DeviceHexDataTypes.ui.value,
+        VALUE_OPTIONS: options,
+    }
+    if state:
+        field[STATE_NAME] = state
+    return CMD_COMMON | {COMMAND_NAME: command, "a2": field}
+
+
 def _extend_model_map() -> None:
     model_map = SOLIXMQTTMAP[MODEL]
+    # The test features (the state fields are named in 0a00 below); the
+    # compatibility state is 1 when off, as the command's value
+    for code, command, parameter, options, state in (
+        ("0211", CUSTOM_MODE_COMMAND, CUSTOM_MODE_PARAMETER, {"off": 0, "on": 1}, None),
+        (
+            "0214",
+            COMPATIBILITY_COMMAND,
+            "set_compatibility",
+            {"on": 0, "off": 1},
+            COMPATIBILITY_OFF_STATE,
+        ),
+        (
+            "0223",
+            IDENTIFICATION_COMMAND,
+            "set_device_identification",
+            {"off": 0, "on": 1},
+            IDENTIFICATION_STATE,
+        ),
+    ):
+        model_map.setdefault(code, _switch_command(command, parameter, options, state))
+        FEATURES.setdefault(command, MODELS)
+    status = model_map.get("0a00", {})
+    status.setdefault("bb", {NAME: COMPATIBILITY_OFF_STATE})
+    status.setdefault("bf", {NAME: IDENTIFICATION_STATE})
     model_map.setdefault(
         "0222",
         CMD_COMMON

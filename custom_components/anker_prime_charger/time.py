@@ -16,6 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import schedules
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
+from .helpers import reported_time
 from .ports import PORTS, Port
 
 # Send the charger one command at a time
@@ -65,7 +66,7 @@ class ScheduleTime(PrimeChargerEntity, TimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the time."""
-        return schedules.reported_time(self.coordinator.data or {}, self._prefix)
+        return reported_time(self.coordinator.data or {}, self._prefix)
 
     async def async_set_value(self, value: time) -> None:
         """Set the time, keeping the rest of the schedule."""

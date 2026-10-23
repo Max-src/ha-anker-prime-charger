@@ -26,12 +26,20 @@ parts, so `part` doesn't matter there).
 from __future__ import annotations
 
 from datetime import time
-from typing import Any, Final
+from typing import Final
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .coordinator import PrimeChargerCoordinator
-from .helpers import WEEKDAYS, is_on, on_off, to_int, to_weekdays, translated
+from .helpers import (
+    WEEKDAYS,
+    is_on,
+    on_off,
+    reported_time,
+    to_int,
+    to_weekdays,
+    translated,
+)
 from .mqtt_extensions import TIMER_STEP
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
@@ -56,18 +64,6 @@ def time_prefix(port: str | None, part: str) -> str:
 def weekdays_key(port: str | None, part: str | None) -> str:
     """Status key of a schedule's weekdays."""
     return f"{port}_{part}_weekdays" if port else "clock_display_weekdays"
-
-
-def reported_time(data: dict[str, Any], prefix: str) -> time | None:
-    """A time the charger reports as <prefix>_hour and <prefix>_minute."""
-    hour = to_int(data.get(f"{prefix}_hour"))
-    minute = to_int(data.get(f"{prefix}_minute"))
-    if hour is None or minute is None:
-        return None
-    try:
-        return time(hour, minute)
-    except ValueError:
-        return None
 
 
 async def async_set_timer(

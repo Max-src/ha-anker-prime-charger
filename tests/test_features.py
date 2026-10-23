@@ -345,27 +345,68 @@ async def test_port_label_not_stored(
 
 
 async def test_test_feature_switches(
-    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry, commands: list
 ) -> None:
-    """Test features are set in the Anker cloud and read back."""
+    """Compatibility and identification: a command to the charger, then the cloud flag."""
     sn = setup_entry.runtime_data.device_sn
+    # the charger hasn't reported them yet: the cloud flags
     assert state(hass, "switch", "compatibility_status") == STATE_ON
     assert state(hass, "switch", "charging_mode_status") == STATE_OFF
     eid = entity_id(hass, "switch", "charging_device_identity_status")
     assert hass.states.get(eid).state == STATE_OFF
 
     await call(hass, "switch", "turn_on", eid)
+    assert commands == [
+        ("device_identification_switch", "on", "set_device_identification")
+    ]
+    assert cloud.mqtt.published_types[-1] == "0223"
+    assert last_command_field(cloud, "a2") == "0101"  # 1: on
     assert (
         "mini_power/v1/app/setting/set_charging_device_identity_status",
         {"device_sn": sn, "charging_device_identity_status": 1},
     ) in cloud.rest_requests
-    assert cloud.rest_requests[-1][0] == "charger_get_device_setting"  # read back
     assert hass.states.get(eid).state == STATE_ON
 
+    commands.clear()
     await call(
         hass, "switch", "turn_off", entity_id(hass, "switch", "compatibility_status")
     )
+    assert commands == [("compatibility_switch", "off", "set_compatibility")]
+    assert cloud.mqtt.published_types[-1] == "0214"
+    assert last_command_field(cloud, "a2") == "0101"  # 1: off (inverted)
     assert state(hass, "switch", "compatibility_status") == STATE_OFF
+    await call(
+        hass, "switch", "turn_on", entity_id(hass, "switch", "compatibility_status")
+    )
+    assert last_command_field(cloud, "a2") == "0100"  # 0: on
+
+
+async def test_test_features_follow_the_charger(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+) -> None:
+    """Once the charger reports them, its state wins over the cloud flags."""
+    # cloud: compatibility on, identification off; the charger says otherwise
+    cloud.mqtt.deliver({"compatibility_off": 1, "device_identification": 1})
+    await hass.async_block_till_done()
+    assert state(hass, "switch", "compatibility_status") == STATE_OFF
+    assert state(hass, "switch", "charging_device_identity_status") == STATE_ON
+
+
+async def test_custom_mode_switch(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """Custom charging mode: on in the cloud only; off also tells the charger (0211)."""
+    eid = entity_id(hass, "switch", "charging_mode_status")
+    await call(hass, "switch", "turn_on", eid)
+    assert commands == []
+    assert hass.states.get(eid).state == STATE_ON
+    await call(hass, "switch", "turn_off", eid)
+    assert commands == [
+        ("custom_charging_mode_switch", "off", "set_custom_charging_mode")
+    ]
+    assert cloud.mqtt.published_types[-1] == "0211"
+    assert last_command_field(cloud, "a2") == "0100"
+    assert hass.states.get(eid).state == STATE_OFF
 
 
 async def test_custom_mode_switch_unlocks_profiles(
@@ -383,13 +424,37 @@ async def test_custom_mode_switch_unlocks_profiles(
 async def test_test_feature_cloud_error(
     hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
 ) -> None:
-    """A cloud error shows in the UI and leaves the state unchanged."""
+    """The charger changed but the cloud refused: an error, and the charger's state."""
+    cloud.mqtt.deliver({"compatibility_off": 0})  # reported: on
+    await hass.async_block_till_done()
     cloud.rest["mini_power/v1/app/setting/set_compatibility_status"] = (
         errors.AnkerSolixError("cloud down")
     )
     eid = entity_id(hass, "switch", "compatibility_status")
     with pytest.raises(HomeAssistantError):
         await call(hass, "switch", "turn_off", eid)
+    assert cloud.mqtt.published_types[-1] == "0214"
+    assert hass.states.get(eid).state == STATE_OFF
+
+
+async def test_test_feature_command_refused(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
+) -> None:
+    """The charger refused the command: an error, and the cloud flag isn't changed."""
+    mdev = setup_entry.runtime_data.mqtt_device
+
+    async def refuse(**kwargs):
+        return None
+
+    mdev.run_command = refuse
+    eid = entity_id(hass, "switch", "compatibility_status")
+    requests = len(cloud.rest_requests)
+    with pytest.raises(HomeAssistantError):
+        await call(hass, "switch", "turn_off", eid)
+    assert not any(
+        "set_compatibility_status" in request[0]
+        for request in cloud.rest_requests[requests:]
+    )
     assert hass.states.get(eid).state == STATE_ON
 
 

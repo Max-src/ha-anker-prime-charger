@@ -1,6 +1,7 @@
 """Sensors for the Anker Prime Charger integration.
 
-Charger: total output power and energy, unlocked hidden animations.
+Charger: total output power and energy. Screen: the page it shows
+(estimated), unlocked hidden animations.
 Ports: power, voltage and current (per physical port), energy, timer end.
 """
 
@@ -24,10 +25,12 @@ from homeassistant.const import (
     UnitOfEnergy,
     UnitOfPower,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
+from . import screen
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
 from .helpers import is_on, summed_power, to_number
@@ -76,6 +79,7 @@ async def async_setup_entry(
         TotalPowerSensor(coordinator),
         EnergySensor(coordinator, "total_output_energy", ALL_OUTPUTS),
         UnlockedAnimations(coordinator),
+        ScreenPage(coordinator),
     ]
     for port in PORTS:
         entities += [
@@ -265,6 +269,65 @@ class PortTimerEnd(PrimeChargerEntity, SensorEntity):
         ):
             return None
         return dt_util.utc_from_timestamp(received + remaining)
+
+
+class ScreenPage(PrimeChargerEntity, SensorEntity):
+    """The page the screen shows: power, clock or off (estimated, see screen.py)."""
+
+    _needs_key = False
+    _attr_translation_key = "screen_page"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(screen.PAGES)
+
+    def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator, "screen_page", screen=True)
+        self._unsub_change: CALLBACK_TYPE | None = None
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the page shown now."""
+        data = self.coordinator.data or {}
+        return screen.page(data, self.coordinator.screen_woke, dt_util.utcnow())
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the page as it changes by itself (Timeout, clock hours)."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_change)
+        self._schedule_change()
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Renamed in place (Home Assistant 2026.11+): nothing here uses the entity id.
+
+        Defining it opts in: the entity is no longer removed and added again.
+        """
+        # defined from Home Assistant 2026.11, the only versions that call this
+        super().async_entity_id_changed(old_entity_id)  # type: ignore[misc,unused-ignore]
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_change()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _schedule_change(self) -> None:
+        self._cancel_change()
+        data = self.coordinator.data or {}
+        at = screen.next_change(data, self.coordinator.screen_woke, dt_util.utcnow())
+        self._unsub_change = async_track_point_in_utc_time(self.hass, self._changed, at)
+
+    @callback
+    def _changed(self, _now: datetime) -> None:
+        self._unsub_change = None
+        self._schedule_change()
+        self.async_write_ha_state()
+
+    @callback
+    def _cancel_change(self) -> None:
+        if self._unsub_change:
+            self._unsub_change()
+            self._unsub_change = None
 
 
 class UnlockedAnimations(PrimeChargerEntity, SensorEntity):

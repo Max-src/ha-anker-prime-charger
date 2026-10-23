@@ -72,9 +72,10 @@ export function readPort(hass, port) {
 }
 
 /**
- * What the 3D card shows of the charger: whether the charger
- * is offline (none of its ports reports), the ids of the ports a device is
- * plugged into, and the text of its screen (the total output).
+ * What the 3D card shows of the charger: whether the charger is offline
+ * (none of its ports reports), the ids of the ports a device is plugged into,
+ * the total output ("12.6 W") and each port's power ({c1: "7.2W"}, the ports
+ * in use), as its power page shows them.
  */
 export function chargerSummary(hass, charger) {
   const ports = charger.ports.map((port) => readPort(hass, port));
@@ -83,7 +84,12 @@ export function chargerSummary(hass, charger) {
   return {
     offline,
     inUse: new Set(ports.filter((port) => port.isConnected).map((port) => port.id)),
-    screen: offline || !Number.isFinite(total) ? "--" : `${formatNumber(hass, total)} W`,
+    total: offline || !Number.isFinite(total) ? "--" : `${formatNumber(hass, total)} W`,
+    portPower: Object.fromEntries(
+      ports
+        .filter((port) => port.isConnected && port.watts !== null)
+        .map((port) => [port.id, `${formatNumber(hass, port.watts)}W`]),
+    ),
   };
 }
 
@@ -91,7 +97,7 @@ export function chargerSummary(hass, charger) {
 export function summaryStates(hass, charger) {
   return [
     hass.states[charger.total_power],
-    ...charger.ports.map((port) => hass.states[port.connected]),
+    ...charger.ports.flatMap((port) => [hass.states[port.connected], hass.states[port.power]]),
   ];
 }
 

@@ -10,16 +10,22 @@ on:
     paths:
       - "custom_components/anker_prime_charger/www/**"
       - "tests/card-docs*"
+      - "tests/readme-links.test.mjs"
       - "package*.json"
       - "README.md"
+      - "CHANGELOG.md"
+      - "docs/**"
       - "images/cards/**"
       - ".github/workflows/documentation-screenshots.yaml"
   pull_request:
     paths:
       - "custom_components/anker_prime_charger/www/**"
       - "tests/card-docs*"
+      - "tests/readme-links.test.mjs"
       - "package*.json"
       - "README.md"
+      - "CHANGELOG.md"
+      - "docs/**"
       - "images/cards/**"
       - ".github/workflows/documentation-screenshots.yaml"
   workflow_dispatch:

@@ -247,6 +247,14 @@
       },
       "unlocked_animations": {
         "name": "Unlocked animations"
+      },
+      "screen_page": {
+        "name": "Page",
+        "state": {
+          "power": "Power",
+          "clock": "Clock",
+          "off": "Off"
+        }
       }
     },
     "switch": {

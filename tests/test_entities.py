@@ -220,6 +220,7 @@ async def test_screen_device(hass: HomeAssistant, setup_entry: MockConfigEntry) 
         ("time", "clock_display_end"),
         ("event", "hidden_animation"),
         ("sensor", "unlocked_animations"),
+        ("sensor", "screen_page"),
     ):
         assert device_of(platform, key) == screen.id, key
     # the rest stays on the charger

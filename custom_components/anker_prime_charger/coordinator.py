@@ -17,6 +17,9 @@ changed.
 
 Settings that live in the Anker cloud are handled by cloud.CloudSettings,
 refreshed in the background.
+
+What wakes the charger's screen (a command, a device plugged in or out) is
+noted in screen_woke, for the estimate of what the screen shows (screen.py).
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from . import issues
+from . import issues, screen
 from .cloud import CloudSettings
 from .const import (
     CONF_SCAN_INTERVAL,
@@ -103,6 +106,10 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._in_message = False
         self._message_changed = False
         self.fast_updates = FastUpdates(self)
+        # The last time the screen woke (on the power page), as far as seen
+        self.screen_woke: datetime | None = None
+        # The clock screensaver's picture for the cards: (key, bytes, type)
+        self.screensaver_image: tuple[str, bytes, str] | None = None
 
     @property
     def device(self) -> dict[str, Any]:
@@ -227,6 +234,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         only updated when a value changed, or with `force`.
         """
         data = self._snapshot()
+        if self.data is not None and screen.plugged_changed(self.data, data):
+            self.screen_woke = dt_util.utcnow()
         unchanged = self.data is not None and _values(data) == _values(self.data)
         self.data = data
         if force or not unchanged:
@@ -327,12 +336,15 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         resp = await mdev.run_command(
             cmd=cmd, value=value, parm=parm, parm_map=dict(parm_map or {})
         )
+        if cmd not in screen.QUIET_COMMANDS:
+            self.screen_woke = dt_util.utcnow()
         self._async_apply_reply(resp, cmd, expected)
 
     async def async_set_custom_profile(self, number: int | str) -> None:
         """Apply a saved custom profile (the library builds the command from it)."""
         mdev = await self.async_ensure_mqtt()
         resp = await mdev.set_custom_usage_profile(number=number)
+        self.screen_woke = dt_util.utcnow()
         self._async_apply_reply(resp, f"custom profile {number}")
 
     @callback
