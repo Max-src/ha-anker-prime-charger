@@ -29,8 +29,7 @@ ENDPOINTS: Final = {
     "update_charging_mode": "mini_power/v1/app/charging/update_charging_mode",
     "add_charging_mode": "mini_power/v1/app/charging/add_charging_mode",
     "delete_charging_mode": "mini_power/v1/app/charging/delete_charging_mode",
-    # custom clock images (from the decompiled app, verified with
-    # probing the cloud; see clock_images.py)
+    # custom clock images (verified by probing the cloud; see clock_images.py)
     "upload_token": "app/cloudstor/get_app_up_token_general",
     "add_custom_theme": "mini_power/v1/app/style/add_manual_clock_screensavers",
     "rename_custom_theme": "mini_power/v1/app/style/set_manual_clock_screensaver_name",

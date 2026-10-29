@@ -1,7 +1,6 @@
 """Custom clock images: add, rename, delete and list them (the app's custom themes).
 
-Found in the Anker app (3.24.3, decompiled) and verified with
-probing the cloud (see docs/PROTOCOL.md):
+Verified by probing the cloud (see docs/PROTOCOL.md):
 
 1. The image is cropped to the screen's 480x200 and saved as a baseline JPEG
    ("cropped_image.jpg", like the app).
@@ -45,7 +44,7 @@ MAX_NAME: Final = 13
 FITS: Final = ("fill", "fit")  # centre-crop, or the whole image with bars
 JPEG_QUALITY: Final = 90
 
-# The Anker app's frame: dark edges, from its mask icl_a2345_custom_theme_cover
+# The Anker app's frame: dark edges
 # (black, 25 % opaque in the middle, ~85 % at the edges, ~96 % in the corners),
 # stretched over the crop and multiplied in. Generated here rather than copied:
 # its profile measured, scaled to 480x200.

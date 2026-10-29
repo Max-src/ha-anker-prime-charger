@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from .coordinator import PrimeChargerCoordinator
 
 CUSTOM_CATEGORY: Final = "Custom"  # images added in the Anker app
-# What the app calls a custom image without a name (its "a2345Customized" text)
+# What the app calls a custom image without a name
 UNNAMED_IMAGE: Final = "Custom"
 STANDARD_CATEGORY: Final = "Standard Style"
 # Order of the theme list, as in the app: Standard Styles, stock themes, custom
@@ -76,8 +76,8 @@ def name_unnamed_custom_themes(
 ) -> None:
     """Name the custom images that have no name, as the Anker app shows them.
 
-    The app shows "Custom <seq>" (its "a2345Customized" text and the image's
-    "seq" from the cloud list), or "Custom" when seq is 0. Without a seq (not
+    The app shows "Custom <seq>" (with the image's "seq" from the cloud
+    list), or "Custom" when seq is 0. Without a seq (not
     read yet), "Image <id>".
     """
     for theme_id, theme in custom_themes.items():

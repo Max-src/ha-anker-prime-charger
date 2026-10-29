@@ -21,3 +21,6 @@ __pycache__/
 # Documentation screenshots tooling (docs/DOCUMENTATION_SCREENSHOTS.md)
 node_modules/
 test-results/
+
+# Private research notes, kept locally only
+docs/private/
