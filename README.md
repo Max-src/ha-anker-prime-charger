@@ -128,15 +128,17 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 
 **Charger**
 
-| Entity                                                                      | What it does                                                                                  |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Total output power, Total output energy                                     | Sum of all ports (W), and the energy delivered (kWh) for the Energy dashboard                 |
-| Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile |
-| Priority ports                                                              | The one or two USB-C ports favoured in Connection priority mode                               |
-| Automatic deactivation                                                      | Custom mode: leave it when a port set to 0 W is used                                          |
-| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features (the first and last are set on the charger, as the app does)          |
-| Fast updates                                                                | Readings every second for a while (see the options)                                           |
-| Refresh                                                                     | Ask for the status now and re-read the cloud settings                                         |
+| Entity                                                                      | What it does                                                                                    |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Total output power, Total output energy                                     | Sum of all ports (W), and the energy delivered (kWh) for the Energy dashboard                   |
+| Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile   |
+| Priority ports                                                              | The one or two USB-C ports favoured in Connection priority mode                                 |
+| Automatic deactivation                                                      | Custom mode: leave it when a port set to 0 W is used                                            |
+| Maximum compatibility, Custom charging mode, Charging device identification | The app's test features (the first and last are set on the charger, as the app does)            |
+| Fast updates                                                                | Readings every second for a while (see the options)                                             |
+| Refresh                                                                     | Ask for the status now and re-read the cloud settings                                           |
+| Overheating                                                                 | On while the charger is too hot (a temperature sensor above 125 °C, until both are below 95 °C) |
+| Firmware update, Firmware update progress                                   | On while the charger installs a firmware update, and how far it is (%)                          |
 
 **Screen**
 
@@ -159,6 +161,8 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Power, Voltage, Current                               | Live readings. Power has the port's maximum as attribute `max_power` (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W) |
 | Energy                                                | Energy delivered (kWh), for the Energy dashboard                                                                         |
 | Connected                                             | On while a device is plugged in                                                                                          |
+| Connected device                                      | USB-C: the brand of the plugged-in device, as the charger identifies it (attributes: USB vendor and product ids)         |
+| Fault                                                 | On while the charger reports a fault on the port (USB-A: either USB-A port)                                              |
 | Label                                                 | The port's name in the Anker app                                                                                         |
 | Custom power limit                                    | The port's limit in custom mode                                                                                          |
 | Custom protocols (+ preset)                           | USB-C: optional fast-charging protocols allowed in custom mode (attribute `allowed`: what the port's power permits)      |
@@ -367,10 +371,10 @@ the charger while it plays, so an animation played with the app closed isn't add
 The integration comes with two cards that show the charger as the Anker app does. They are
 loaded automatically: nothing to install or add under **Resources**.
 
-| Card                            | Shows                                                                                                                            |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Anker Prime Charger 3D**      | The charger in 3D: the ports in use (with their cables and power) and what its screen shows; drag it to turn it, zoom in and out |
-| **Anker Prime Charger outputs** | _USB-C Output_ and _USB-A Output_: each port's power, voltage and current; tap a port for its power history                      |
+| Card                            | Shows                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Anker Prime Charger 3D**      | The charger in 3D: the ports in use (with their cables and power) and what its screen shows; drag it to turn it, zoom in and out                             |
+| **Anker Prime Charger outputs** | _USB-C Output_ and _USB-A Output_: each port's power, voltage and current, and on USB-C the device's brand once identified; tap a port for its power history |
 
 To add one, edit a dashboard, choose **Add card**, and search for **Anker**. The visual editor
 lets you choose the **Charger** (the first one is preselected), for the outputs card whether to

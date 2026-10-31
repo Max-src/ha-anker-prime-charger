@@ -23,8 +23,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 import zlib
 
-from aiohttp import ClientError
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -320,16 +318,7 @@ async def async_preview_url(
     coordinator: PrimeChargerCoordinator, item: ClockImage
 ) -> str | None:
     """A fresh link to a custom image (valid a few minutes), or None."""
-    if not item.short_url:
-        return None
-    try:
-        answer = await library.async_request(
-            coordinator.api, "theme_url", {"short_url": item.short_url}
-        )
-    except (*CLOUD_ERRORS, ClientError):
-        return None
-    url = answer.get("url")
-    return url if isinstance(url, str) else None
+    return await coordinator.cloud.async_fresh_link(item.short_url)
 
 
 async def async_list(coordinator: PrimeChargerCoordinator) -> list[dict[str, Any]]:

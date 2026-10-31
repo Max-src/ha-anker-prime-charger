@@ -13,9 +13,10 @@
 | `fast_updates.py`              | Fast updates: resend the real-time trigger every 8 s until the duration runs out                                                                                                                                                                                                                                                                                                                                                               |
 | `cloud.py`                     | Settings stored in the Anker cloud: background refresh, test features, port labels, profile requests                                                                                                                                                                                                                                                                                                                                           |
 | `library.py`                   | **The only place that touches the vendored library's internals**: client creation, server override, raw cloud requests, the endpoint table                                                                                                                                                                                                                                                                                                     |
-| `mqtt_extensions.py`           | What we add to or correct in the library's description of the charger's messages                                                                                                                                                                                                                                                                                                                                                               |
+| `mqtt_extensions.py`           | What we add to the library's description of the charger's messages (0211, 0305, the timer step), the library's names we use, the values its cache drops                                                                                                                                                                                                                                                                                        |
 | `ports.py`                     | The five ports (USB-C 1-4, USB-A) and their child devices; how each port is named in MQTT, the custom mode and the cloud; maximum power, priority options. **The one place for port facts**: the other modules derive their tables from `PORTS`                                                                                                                                                                                                |
 | `themes.py`                    | Clock themes: Standard Styles, theme list, current theme, theme command                                                                                                                                                                                                                                                                                                                                                                        |
+| `identity.py`                  | The device on each USB-C port: brand (the charger's brand numbers, else the USB vendor id), ids                                                                                                                                                                                                                                                                                                                                                |
 | `screen.py`                    | The screen's page (power, clock or off), estimated: what wakes it (commands except the theme command, plugging in or out), Timeout, the clock's hours                                                                                                                                                                                                                                                                                          |
 | `clock_images.py`              | Custom clock images: prepare (480x200 JPEG, optional frame), upload, add, rename, delete, list; names checked like the app (13 characters, unique). New frames: a function in `FRAMES`, plus its option in `services.yaml` and the `clock_image_frame` translations                                                                                                                                                                            |
 | `custom_mode.py`               | Custom charging mode settings: limits, protocols, checks, the `0206` command                                                                                                                                                                                                                                                                                                                                                                   |
@@ -82,7 +83,9 @@ wsl -d Ubuntu -u root -- bash -c "cd '$repo' && /root/ha-test-venv/bin/python -m
 ```
 
 `tests/test_library_contract.py` lists what the integration relies on in the library; run it first
-after updating the library.
+after updating the library. `tests/test_command_bytes.py` checks that the library still builds every
+command the integration sends byte for byte as before (`tests/command_bytes.json`, checked on a
+real charger).
 
 CI (`.github/workflows/tests.yml`) runs the tests against three Home Assistant versions, each
 pinned by a `pytest-homeassistant-custom-component` release: **minimum** (the version in
@@ -152,7 +155,9 @@ mypy --strict --follow-imports=silent --ignore-missing-imports --exclude solixap
 ## Updating the vendored library
 
 1. Replace `solixapi/` with the new upstream version and update `solixapi/VERSION.txt`.
-2. Run `tests/test_library_contract.py`, then the whole suite.
+2. Run `tests/test_library_contract.py` and `tests/test_command_bytes.py`, then the whole suite. A
+   command whose bytes changed must be checked on a charger before `command_bytes.json` is
+   updated.
 3. If upstream now covers something `mqtt_extensions.py` adds or corrects, remove it there.
 
 ## How the protocol was found

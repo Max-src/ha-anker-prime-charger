@@ -7,9 +7,10 @@ Three kinds of themes (decoded by watching the Anker app's MQTT messages):
 - Anker's stock themes (from the Anker cloud, e.g. "Futuristic - Celestial").
 - custom images added in the Anker app (from the Anker cloud).
 
-The kind is the low 3 bits of the clock flag byte "clock_settings" (see
-mqtt_extensions.py). With a Standard Style active the charger still reports
-the previous theme's id, so the kind decides which theme is current.
+The kind is the low 3 bits of the clock flag byte "clock_settings": 0, 1, 2
+the Standard Styles 1-3, 3 a stock theme, 5 a custom image. With a Standard
+Style active the charger still reports the previous theme's id, so the kind
+decides which theme is current.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ from typing import TYPE_CHECKING, Any, Final
 from homeassistant.exceptions import HomeAssistantError
 
 from .helpers import is_on, on_off, to_int, translated
-from .mqtt_extensions import THEME_KIND_MASK, THEME_KINDS
 from .solixapi.mqttcmdmap import SolixMqttCommands
 
 if TYPE_CHECKING:
@@ -33,6 +33,15 @@ STANDARD_CATEGORY: Final = "Standard Style"
 CATEGORY_ORDER: Final = {STANDARD_CATEGORY: 0, CUSTOM_CATEGORY: 2}
 CLOCK_ON: Final = 0x80  # clock flag byte: clock screen shown
 HOLIDAY_ON: Final = 0x40  # clock flag byte: holiday updates
+THEME_KIND_MASK: Final = 0x07  # clock flag byte: the theme kind
+# Our theme kinds: (value in the clock flag byte, the library's option name)
+THEME_KINDS: Final[dict[str, tuple[int, str]]] = {
+    "style_1": (0, "theme_1"),
+    "style_2": (1, "theme_2"),
+    "style_3": (2, "theme_3"),
+    "stock": (3, "stock"),
+    "custom": (5, "custom"),
+}
 
 STANDARD_STYLES: Final[tuple[dict[str, Any], ...]] = tuple(
     {
@@ -106,7 +115,7 @@ def current_theme(coordinator: PrimeChargerCoordinator) -> dict[str, Any]:
     settings = to_int(data.get("clock_settings"))
     kind = None if settings is None else settings & THEME_KIND_MASK
     for style in STANDARD_STYLES:
-        if THEME_KINDS[style["kind"]] == kind:
+        if THEME_KINDS[style["kind"]][0] == kind:
             return style
     theme_id = data.get("theme_id")
     if theme_id is None:
@@ -131,13 +140,20 @@ async def async_set_theme(
         clock_on = bool(is_on(data.get("clock_switch")))
     holiday_on = bool(is_on(data.get("holiday_switch")))
     kind = theme.get("kind", "stock")
+    kind_value, kind_option = THEME_KINDS[kind]
+    url = theme.get("image_url") or ""
+    if kind == "custom":
+        # The charger downloads the image: the link read with the custom image
+        # list has expired after 5 minutes (it then shows the previous theme)
+        path = coordinator.cloud.custom_paths.get(str(theme.get("id")), "")
+        url = await coordinator.cloud.async_fresh_link(path) or url
     parm_map = {
         "set_clock_switch": on_off(clock_on),
         "set_holiday_switch": on_off(holiday_on),
-        "set_theme_type": kind,
+        "set_theme_type": kind_option,
         "set_theme_id": int(theme.get("id") or 0),
         "set_theme_hash": int(str(theme.get("file_hash") or "0"), 16),
-        "set_theme_url": theme.get("image_url") or "",
+        "set_theme_url": url,
     }
     # The library can't predict the new flag byte: compute it
     settings = to_int(data.get("clock_settings")) or 0
@@ -145,11 +161,11 @@ async def async_set_theme(
         "clock_settings": (settings & ~(CLOCK_ON | HOLIDAY_ON | THEME_KIND_MASK))
         | (CLOCK_ON if clock_on else 0)
         | (HOLIDAY_ON if holiday_on else 0)
-        | THEME_KINDS[kind]
+        | kind_value
     }
     command = (
-        SolixMqttCommands.charger_theme_custom
+        SolixMqttCommands.display_theme_custom
         if kind == "custom"
-        else SolixMqttCommands.charger_theme
+        else SolixMqttCommands.display_theme
     )
     await coordinator.async_send_command(command, parm_map=parm_map, expected=expected)

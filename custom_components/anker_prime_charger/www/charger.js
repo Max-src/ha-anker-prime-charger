@@ -42,7 +42,7 @@ export function loadCharger(hass, deviceId = "") {
 
 /** The state objects a port shows (for change detection). */
 export function portStates(hass, port) {
-  return [port.connected, port.power, port.voltage, port.current].map(
+  return [port.connected, port.power, port.voltage, port.current, port.device].map(
     (entityId) => (entityId ? hass.states[entityId] : undefined),
   );
 }
@@ -54,20 +54,24 @@ function number(state) {
 
 /**
  * A port as the cards show it: whether a device is plugged in (connected:
- * true / false, null when unknown), and its readings (numbers, null when
- * unknown). Readings of a port without a device are not shown (null).
+ * true / false, null when unknown), its readings (numbers, null when
+ * unknown) and the device's brand as the charger identifies it (USB-C; null
+ * when unknown). Readings of a port without a device are not shown (null).
  */
 export function readPort(hass, port) {
   const status = port.connected ? hass.states[port.connected]?.state : undefined;
   const connected = status === "on" ? true : status === "off" ? false : null;
   const reading = (entityId) =>
     connected && entityId ? number(hass.states[entityId]) : null;
+  const device = port.device ? hass.states[port.device]?.state : undefined;
   return {
     ...port,
     isConnected: connected,
     watts: reading(port.power),
     volts: reading(port.voltage),
     amps: reading(port.current),
+    deviceName:
+      connected && device && !["unknown", "unavailable"].includes(device) ? device : null,
   };
 }
 

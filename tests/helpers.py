@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from custom_components.anker_prime_charger.const import DOMAIN
+from custom_components.anker_prime_charger.solixapi.mqtttypes import DeviceHexData
 from homeassistant.const import ATTR_DEVICE_ID, ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -60,18 +61,11 @@ async def call(
 
 
 def last_command_field(cloud: FakeCloud, field: str) -> str:
-    """Hex value (type byte + value) of a field ("a2", ...) of the last published command."""
-    last = cloud.mqtt.published[-1]
-    raw = (
-        bytes(last)
-        if isinstance(last, bytes | bytearray)
-        else bytes.fromhex(last.replace(":", ""))
-    )
-    # 9 header bytes, then fields: name, length, type + value
-    pos = 9
-    while pos < len(raw) - 1:
-        name, length = raw[pos], raw[pos + 1]
-        if f"{name:02x}" == field:
-            return raw[pos + 2 : pos + 2 + length].hex()
-        pos += 2 + length
-    raise AssertionError(f"field {field} not in {raw.hex(':')}")
+    """Hex value (type byte + value) of a field ("a2", ...) of the last published command.
+
+    Read with the library's own parser, which also reads 2 byte field lengths.
+    """
+    msg = DeviceHexData(hexbytes=cloud.mqtt.published[-1])
+    assert field in msg.msg_fields, f"field {field} not in {msg.hexbytes.hex(':')}"
+    data = msg.msg_fields[field]
+    return (data.f_type + data.f_value).hex()

@@ -69,6 +69,15 @@
       },
       "a2_connected": {
         "name": "A2 connected"
+      },
+      "fault": {
+        "name": "Fault"
+      },
+      "over_temperature": {
+        "name": "Overheating"
+      },
+      "firmware_update": {
+        "name": "Firmware update"
       }
     },
     "button": {
@@ -206,6 +215,9 @@
       "total_output_energy": {
         "name": "Total output energy"
       },
+      "firmware_update_progress": {
+        "name": "Firmware update progress"
+      },
       "energy": {
         "name": "Energy"
       },
@@ -244,6 +256,23 @@
       },
       "timer_end": {
         "name": "Timer end"
+      },
+      "connected_device": {
+        "name": "Connected device",
+        "state_attributes": {
+          "vendor_id": {
+            "name": "Vendor ID"
+          },
+          "product_id": {
+            "name": "Product ID"
+          },
+          "brand_number": {
+            "name": "Brand number"
+          },
+          "model_number": {
+            "name": "Model number"
+          }
+        }
       },
       "unlocked_animations": {
         "name": "Unlocked animations"

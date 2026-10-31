@@ -37,8 +37,8 @@ TIMEOUTS: Final[dict[int, timedelta | None]] = {
 }
 # Commands that don't wake the screen
 QUIET_COMMANDS: Final = (
-    SolixMqttCommands.charger_theme,
-    SolixMqttCommands.charger_theme_custom,
+    SolixMqttCommands.display_theme,
+    SolixMqttCommands.display_theme_custom,
 )
 # A device plugged in or out of a port
 PORT_STATUS_KEYS: Final = tuple(

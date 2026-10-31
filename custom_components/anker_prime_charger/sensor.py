@@ -1,8 +1,9 @@
 """Sensors for the Anker Prime Charger integration.
 
-Charger: total output power and energy. Screen: the page it shows
-(estimated), unlocked hidden animations.
-Ports: power, voltage and current (per physical port), energy, timer end.
+Charger: total output power and energy, firmware update progress. Screen:
+the page it shows (estimated), unlocked hidden animations.
+Ports: power, voltage and current (per physical port), energy, timer end,
+the connected device (USB-C).
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    PERCENTAGE,
     EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -30,11 +32,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.util import dt as dt_util
 
-from . import screen
+from . import identity, screen
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import is_on, summed_power, to_number
-from .ports import PORTS, Port
+from .helpers import is_on, summed_power, to_int, to_number
+from .ports import PORTS, USB_C_PORTS, Port
 
 # Updates come from the coordinator: no limit needed
 PARALLEL_UPDATES = 0
@@ -80,7 +82,9 @@ async def async_setup_entry(
         EnergySensor(coordinator, "total_output_energy", ALL_OUTPUTS),
         UnlockedAnimations(coordinator),
         ScreenPage(coordinator),
+        FirmwareUpdateProgress(coordinator),
     ]
+    entities += [ConnectedDevice(coordinator, port) for port in USB_C_PORTS]
     for port in PORTS:
         entities += [
             PortReading(coordinator, port, output, description)
@@ -269,6 +273,69 @@ class PortTimerEnd(PrimeChargerEntity, SensorEntity):
         ):
             return None
         return dt_util.utc_from_timestamp(received + remaining)
+
+
+class ConnectedDevice(PrimeChargerEntity, SensorEntity):
+    """The device plugged into a USB-C port: its brand (see identity.py).
+
+    Unknown without a device or until the charger has read it; unavailable if
+    the charger can't read devices. Attributes: the USB vendor and product
+    ids, the charger's brand and model numbers.
+    """
+
+    port: Port
+
+    _attr_translation_key = "connected_device"
+
+    def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
+        """Initialize."""
+        super().__init__(
+            coordinator,
+            f"{port.key}_device_vid",
+            port,
+            unique_key=f"{port.key}_connected_device",
+        )
+
+    def _device(self) -> dict[str, Any] | None:
+        return identity.connected_device(self.coordinator.data or {}, self.port.key)
+
+    @property
+    def available(self) -> bool:
+        """Available unless the charger says it can't read devices."""
+        data = self.coordinator.data or {}
+        return super().available and identity.identity_supported(data) is not False
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the device's brand (or vendor id)."""
+        device = self._device()
+        return device["name"] if device else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The device's ids and the charger's numbers for it."""
+        device = self._device() or {}
+        return {
+            key: device.get(key)
+            for key in ("vendor_id", "product_id", "brand_number", "model_number")
+        }
+
+
+class FirmwareUpdateProgress(PrimeChargerEntity, SensorEntity):
+    """How far a firmware update is (%), from the status (0a00 b2)."""
+
+    _attr_translation_key = "firmware_update_progress"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator, "ota_progress")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the progress."""
+        return to_int(self.mqtt_value)
 
 
 class ScreenPage(PrimeChargerEntity, SensorEntity):

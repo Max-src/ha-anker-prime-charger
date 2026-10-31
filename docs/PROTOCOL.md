@@ -20,26 +20,29 @@ name, length, type, value) and an XOR checksum. The vendored library encodes and
 
 ## Status
 
-| What                    | How                                                                                  | Status                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| Full status             | Status request `0200` → message `0a00`                                               | Library                                                        |
-| Theme message           | Theme request `0202` → message `0a02` (theme id and link, clock flags, time display) | Library + ours                                                 |
-| Live port values        | Real-time trigger `020b` (no parameters) → message `0303` every second for 10 s      | Verified: 10 messages, last at 10.2 s                          |
-| Hidden animation played | Message `0305`, field `a2` = animation type                                          | Verified (type 5 after unplugging a port 10 times within 60 s) |
+| What                      | How                                                                                                                                                                                                                                            | Status                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Full status               | Status request `0200` → message `0a00`                                                                                                                                                                                                         | Library                                                        |
+| Theme message             | Theme request `0202` → message `0a02` (theme id and link, clock flags, time display)                                                                                                                                                           | Library                                                        |
+| Live port values          | Real-time trigger `020b` (no parameters) → message `0303` every second for 10 s                                                                                                                                                                | Verified: 10 messages, last at 10.2 s                          |
+| Hidden animation played   | Message `0305`, field `a2` = animation type                                                                                                                                                                                                    | Verified (type 5 after unplugging a port 10 times within 60 s) |
+| Port faults, overheating  | Status `0a00` field `a3`: bit 0 overheating, bits 1-4 USB-C 1-4, bit 5 USB-A (set after 5 readings with a fault, cleared after 10 without)                                                                                                     | Library (upstream decoding); not seen on this charger          |
+| Firmware update           | Status `0a00` field `b2`: byte 0 busy (1 while an update is armed; the live values pause), byte 1 progress %; message `0306` during an update (`a2` state, `a3` progress)                                                                      | Library (upstream decoding); not seen on this charger          |
+| Device on each USB-C port | Status `0a00` fields `bd` (USB vendor and product id per port; `fffa`/`fffb` without a device, 0 until read) and `be` (the charger brand and model numbers); live values `0303` `a8`/`a9`; `b7` byte 1: 6 when the ports can read them, else 2 | Library (upstream decoding); to verify on this charger         |
 
 ## Commands decoded or corrected here
 
 | What                                 | Command                                                                                                                        | State                                                                                                                                                                           |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Time display (time on custom images) | `0222`, `a2`: 0 off / 1 on                                                                                                     | `0a02` field `a6` (library: `unknown_0a02_a6`) — verified                                                                                                                       |
-| Theme kind                           | `0205`, low 3 bits of `a2`: 0-2 Standard Style 1-3, 3 stock theme, 5 custom image                                              | Low 3 bits of `clock_settings` — verified. The library reads them as two flags (`0x02`, `0x04`), which sends the wrong kind                                                     |
+| Time display (time on custom images) | `0222`, `a2`: 0 off / 1 on                                                                                                     | `0a02` field `a6` (library: `clock_time_switch`) — verified                                                                                                                       |
+| Theme kind                           | `0205`, low 3 bits of `a2`: 0-2 Standard Style 1-3, 3 stock theme, 5 custom image                                              | Low 3 bits of `clock_settings` — verified. The library now agrees (`theme_type`, options `theme_1`-`theme_3`, `stock`, `custom`)                                                     |
 | Standard Styles                      | `0205` with kind 0-2, theme id 4, hash 0, app-internal image path (`assets/img/…/icl_a2345_themeN.png`)                        | Verified. With a Standard Style active the charger still reports the previous theme id                                                                                          |
 | Port timer duration                  | `0209`, `a3` byte `01`: seconds. The library rounds to 300 s steps (the app's 5 minutes); the charger also takes whole minutes | Verified: a 1-minute timer switches the port off after 1 minute. `mqtt_extensions.py` sets the step to 60 s. A timer turned on with 0 s runs 60 min (the integration's default) |
 
-The library's cache update drops values it doesn't know (`time_display`, the animation type), so
-the coordinator keeps them itself; `tests/test_library_contract.py` notices if that changes.
-Upstream anker-solix-api has since added the time display, the theme kinds and the test
-feature commands (late October 2026); the vendored copy predates that.
+Upstream anker-solix-api added the time display, the theme kinds and the test feature commands
+in late October 2026; the integration uses its definitions since. The library's cache update
+drops the identity values below (and the animation type), so the coordinator keeps them itself;
+`tests/test_library_contract.py` notices if that changes.
 
 ## Charging modes
 
@@ -154,7 +157,9 @@ the app and on the charger):
    `/anker_power/edge/screen_saver/2026/10/16/<account hash>/<random>.cropped_image.jpg`, which
    later shows as the image's `short_url`) and `hash_code` = `0x` + CRC32 in hex.
 4. Show it with the theme command (`0205`, kind 5): the app puts the image link in field `a7`
-   (stock themes use `a6`), the image id in `a3` and the CRC32 in `a4` (little-endian).
+   (stock themes use `a6`), the image id in `a3` and the CRC32 in `a4` (little-endian). The
+   charger downloads the image from that link, so it must be fresh: the signed links (from the
+   image list or `style/get_url`) expire after 5 minutes. The link goes without a length byte.
 
 How the app handles custom images:
 

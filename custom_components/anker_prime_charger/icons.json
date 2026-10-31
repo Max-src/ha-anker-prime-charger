@@ -1,5 +1,10 @@
 {
   "entity": {
+    "binary_sensor": {
+      "firmware_update": {
+        "default": "mdi:update"
+      }
+    },
     "button": {
       "refresh": {
         "default": "mdi:refresh"
@@ -84,6 +89,12 @@
           "clock": "mdi:clock-outline",
           "off": "mdi:monitor-off"
         }
+      },
+      "connected_device": {
+        "default": "mdi:cellphone-link"
+      },
+      "firmware_update_progress": {
+        "default": "mdi:progress-upload"
       }
     },
     "switch": {

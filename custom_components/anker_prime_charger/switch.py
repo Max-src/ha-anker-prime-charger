@@ -24,6 +24,7 @@ from .mqtt_extensions import (
     CUSTOM_MODE_PARAMETER,
     TEST_FEATURE_COMMANDS,
     TIME_DISPLAY_COMMAND,
+    TIME_DISPLAY_PARAMETER,
     TIME_DISPLAY_STATE,
 )
 from .ports import PORTS, Port
@@ -155,11 +156,13 @@ class TimeDisplaySwitch(ReportedSwitch):
 
     def __init__(self, coordinator: PrimeChargerCoordinator) -> None:
         """Initialize."""
-        super().__init__(coordinator, TIME_DISPLAY_STATE, screen=True)
+        super().__init__(
+            coordinator, TIME_DISPLAY_STATE, unique_key="time_display", screen=True
+        )
 
     async def _async_set(self, on: bool) -> None:
         await self.coordinator.async_send_command(
-            TIME_DISPLAY_COMMAND, on_off(on), "set_time_display"
+            TIME_DISPLAY_COMMAND, on_off(on), TIME_DISPLAY_PARAMETER
         )
 
 

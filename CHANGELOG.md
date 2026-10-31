@@ -25,6 +25,13 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
   an hour. Both clear on their own.
 - Icons for the entities and actions; the charger's device lists its Wi-Fi and Bluetooth
   addresses.
+- **Connected device** sensor on each USB-C port: the brand of the plugged-in device as the
+  charger identifies it (Apple, Samsung, Anker, ...; else its USB vendor id), with its USB
+  vendor and product ids as attributes. The outputs card shows it under the port.
+- **Fault** on each port and **Overheating** on the charger: problem sensors from the faults the
+  charger reports.
+- **Firmware update** and **Firmware update progress** on the charger: on while the charger
+  installs an update, and how far it is.
 
 ### Fixed
 
@@ -32,12 +39,20 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
   itself, as the app does (they only changed the setting stored in the Anker cloud, which the
   charger ignores), and show the charger's own state. Turning off **Custom charging mode** also
   tells the charger, as the app does.
+- Choosing a custom image as the clock theme sends a fresh link to it: the link read with the
+  image list expires after 5 minutes, and the charger then couldn't download the image.
+- The clock theme no longer shows as unknown for about 30 seconds every 5 minutes (and most of
+  the time while the screen's values are updated quickly): the updated library couldn't read the
+  theme id in some of the charger's messages.
 
 ### Changed
 
 - Choosing the charging mode that is already active no longer sends it again (every mode change
   restarts the ports for a few seconds).
 - An unnamed custom image shows as `Custom <number>`, as in the Anker app.
+- Updated the bundled Anker library (anker-solix-api, 2026-10-30). It now knows the time display,
+  the clock theme kinds and the test features of the A2345, so the integration uses its
+  definitions instead of its own; nothing changes for the entities.
 
 ### Documentation
 

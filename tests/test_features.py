@@ -18,7 +18,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from .conftest import STOCK_THEME_URL, FakeCloud
+from .conftest import FIREWORKS_URL, STOCK_THEME_URL, FakeCloud, fresh_link
 from .helpers import attr, call, entity_id, last_command_field, state
 
 WEEKDAYS_MON_FRI = ["mon", "tue", "wed", "thu", "fri"]
@@ -44,7 +44,7 @@ async def test_clock_display_switch_keeps_theme_and_holiday(
     await call(hass, "switch", "turn_off", eid)
     assert commands == [
         (
-            "charger_theme",
+            "display_theme",
             {
                 "set_clock_switch": "off",
                 "set_holiday_switch": "on",
@@ -69,7 +69,7 @@ async def test_time_display_switch(
     assert hass.states.get(eid).state == STATE_ON
 
     await call(hass, "switch", "turn_off", eid)
-    assert commands == [("time_display_switch", "off", "set_time_display")]
+    assert commands == [("clock_time_switch", "off", "set_clock_time_switch")]
     assert cloud.mqtt.published_types[-1] == "0222"
     assert last_command_field(cloud, "a2") == "0100"
     assert hass.states.get(eid).state == STATE_OFF
@@ -82,24 +82,24 @@ async def test_time_display_switch(
 async def test_time_display_survives_library_cache(
     hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
 ) -> None:
-    """The library's cache update drops time_display; the integration keeps it.
+    """The time display reported through the library's cache update reaches the switch.
 
-    Regression: the switch stayed unavailable on a real charger.
+    Regression: the switch stayed unavailable on a real charger (the library
+    used to drop the value).
     """
     eid = entity_id(hass, "switch", "time_display")
-    setup_entry.runtime_data.device["mqtt_data"].pop("time_display")
-    cloud.mqtt.deliver({"theme_id": 47833, "time_display": 0})
+    setup_entry.runtime_data.device["mqtt_data"].pop("clock_time_switch")
+    cloud.mqtt.deliver({"theme_id": 47833, "clock_time_switch": 0})
     await hass.async_block_till_done()
     assert hass.states.get(eid).state == STATE_OFF
 
-    cloud.mqtt.deliver({"theme_id": 47833, "time_display": 1})
+    cloud.mqtt.deliver({"theme_id": 47833, "clock_time_switch": 1})
     await hass.async_block_till_done()
     assert hass.states.get(eid).state == STATE_ON
 
 
 def test_theme_message_time_display_decoded() -> None:
-    """The charger's theme message 0a02 field a6 is decoded as time_display."""
-    from custom_components.anker_prime_charger import mqtt_extensions  # noqa: F401
+    """The charger's theme message 0a02 field a6 is decoded as the time display."""
     from custom_components.anker_prime_charger.solixapi.mqtttypes import DeviceHexData
 
     # As captured: a2 flags c5, a3 theme id 47833, a4 04, a6 time display off
@@ -110,7 +110,7 @@ def test_theme_message_time_display_decoded() -> None:
     )
     data += bytes([reduce(xor, data, 0)])  # XOR checksum
     values = DeviceHexData(model="A2345", hexbytes=data).values()
-    assert values.get("time_display") == 0
+    assert values.get("clock_time_switch") == 0
     assert values.get("theme_id") == 47833
 
 
@@ -134,7 +134,7 @@ async def test_clock_theme_select(
 
     await call(hass, "select", "select_option", eid, option="Custom - Fireworks")
     cmd, parm_map = commands[-1]
-    assert cmd == "charger_theme_custom"
+    assert cmd == "display_theme_custom"
     assert parm_map["set_theme_id"] == 38820
     assert parm_map["set_theme_hash"] == 0x14EDD612
     assert parm_map["set_clock_switch"] == "on"
@@ -142,15 +142,31 @@ async def test_clock_theme_select(
     assert parm_map["set_theme_type"] == "custom"
     # flags byte: clock on, holiday on, custom image (kind 5), like the app
     assert last_command_field(cloud, "a2") == "01c5"
+    # a fresh link (the listed one has expired), without a length byte, like the app
+    link = fresh_link("/custom/fw.jpg")
+    assert len(link) > 255
+    assert parm_map["set_theme_url"] == link
+    assert last_command_field(cloud, "a7") == "04" + link.encode().hex()
     st = hass.states.get(eid)
     assert st.state == "Custom - Fireworks"
     # signed custom image links expire, so no picture
     assert "entity_picture" not in st.attributes
 
     await call(hass, "select", "select_option", eid, option="Cosmic - Lunar")
-    assert commands[-1][0] == "charger_theme"
+    assert commands[-1][0] == "display_theme"
     assert last_command_field(cloud, "a2") == "01c3"  # stock image (kind 3)
     assert state(hass, "select", "theme_id") == "Cosmic - Lunar"
+
+
+async def test_custom_theme_without_fresh_link(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """The cloud not answering: the listed link is sent (it may still be valid)."""
+    cloud.rest["mini_power/v1/app/style/get_url"] = errors.AnkerSolixError("down")
+    eid = entity_id(hass, "select", "theme_id")
+    await call(hass, "select", "select_option", eid, option="Custom - Fireworks")
+    assert commands[-1][1]["set_theme_url"] == FIREWORKS_URL
+    assert state(hass, "select", "theme_id") == "Custom - Fireworks"
 
 
 async def test_custom_images_follow_the_cloud_on_refresh(
@@ -196,11 +212,11 @@ async def test_standard_style_themes(
     eid = entity_id(hass, "select", "theme_id")
     await call(hass, "select", "select_option", eid, option="Standard Style - Theme 2")
     cmd, parm_map = commands[-1]
-    assert cmd == "charger_theme"
+    assert cmd == "display_theme"
     assert parm_map == {
         "set_clock_switch": "on",
         "set_holiday_switch": "on",
-        "set_theme_type": "style_2",
+        "set_theme_type": "theme_2",
         "set_theme_id": 4,
         "set_theme_hash": 0,
         "set_theme_url": "assets/img/a2345/icl_a2345_theme2.png",
@@ -356,9 +372,7 @@ async def test_test_feature_switches(
     assert hass.states.get(eid).state == STATE_OFF
 
     await call(hass, "switch", "turn_on", eid)
-    assert commands == [
-        ("device_identification_switch", "on", "set_device_identification")
-    ]
+    assert commands == [("device_id_switch", "on", "set_device_id_switch")]
     assert cloud.mqtt.published_types[-1] == "0223"
     assert last_command_field(cloud, "a2") == "0101"  # 1: on
     assert (
@@ -371,7 +385,7 @@ async def test_test_feature_switches(
     await call(
         hass, "switch", "turn_off", entity_id(hass, "switch", "compatibility_status")
     )
-    assert commands == [("compatibility_switch", "off", "set_compatibility")]
+    assert commands == [("compatibility_switch", "off", "set_compatibility_switch")]
     assert cloud.mqtt.published_types[-1] == "0214"
     assert last_command_field(cloud, "a2") == "0101"  # 1: off (inverted)
     assert state(hass, "switch", "compatibility_status") == STATE_OFF
@@ -386,7 +400,7 @@ async def test_test_features_follow_the_charger(
 ) -> None:
     """Once the charger reports them, its state wins over the cloud flags."""
     # cloud: compatibility on, identification off; the charger says otherwise
-    cloud.mqtt.deliver({"compatibility_off": 1, "device_identification": 1})
+    cloud.mqtt.deliver({"compatibility_switch": 1, "device_id_switch": 1})
     await hass.async_block_till_done()
     assert state(hass, "switch", "compatibility_status") == STATE_OFF
     assert state(hass, "switch", "charging_device_identity_status") == STATE_ON
@@ -425,7 +439,7 @@ async def test_test_feature_cloud_error(
     hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry
 ) -> None:
     """The charger changed but the cloud refused: an error, and the charger's state."""
-    cloud.mqtt.deliver({"compatibility_off": 0})  # reported: on
+    cloud.mqtt.deliver({"compatibility_switch": 0})  # reported: on
     await hass.async_block_till_done()
     cloud.rest["mini_power/v1/app/setting/set_compatibility_status"] = (
         errors.AnkerSolixError("cloud down")

@@ -42,6 +42,8 @@ DEVICE = {
     "sw_version": "2.1.1.6",
     "is_admin": True,
     "mqtt_supported": True,
+    # without "wifi" the library takes it for a Bluetooth device and sends no commands
+    "relate_type": ["ble", "wifi"],
 }
 
 # Decoded status as the library stores it. Some values are strings on purpose:
@@ -80,8 +82,7 @@ STATUS = {
     "clock_settings": 0xC3,
     "clock_switch": 1,
     "holiday_switch": 1,
-    "stock_theme_active": 1,
-    "custom_theme_active": 0,
+    "theme_type": 3,
     "theme_id": 948897111,
     # shown 07:00-22:30, Monday to Friday (bitmask, bit 0 = Monday)
     "clock_display_start_hour": 7,
@@ -101,8 +102,37 @@ STATUS = {
     "custom_usb_c2_protocols": [],
     "custom_usb_c3_protocols": [],
     "custom_usb_c4_protocols": ["ufcs"],
-    # from the theme message 0a02 (named by mqtt_extensions.py)
-    "time_display": 1,
+    # from the theme message 0a02: time display
+    "clock_time_switch": 1,
+    # no fault, no firmware update
+    "over_temperature": 0,
+    "usbc_1_fault": 0,
+    "usbc_2_fault": 0,
+    "usbc_3_fault": 0,
+    "usbc_4_fault": 0,
+    "usba_fault": 0,
+    "ota_busy": 0,
+    "ota_progress": 0,
+    # the ports can identify devices (6); USB-C 1: an Apple device (VID 05ac,
+    # brand 1), USB-C 2: not identified (yet), USB-C 3: an unknown brand,
+    # USB-C 4: no device (fffa, fffb)
+    "usbc_identity_support": 6,
+    "usbc_1_device_vid": 0x05AC,
+    "usbc_1_device_pid": 0x12A8,
+    "usbc_1_device_class": 1,
+    "usbc_1_device_code": 7,
+    "usbc_2_device_vid": 0,
+    "usbc_2_device_pid": 0,
+    "usbc_2_device_class": 0,
+    "usbc_2_device_code": 0,
+    "usbc_3_device_vid": 0x1234,
+    "usbc_3_device_pid": 0x5678,
+    "usbc_3_device_class": 0,
+    "usbc_3_device_code": 0,
+    "usbc_4_device_vid": 0xFFFA,
+    "usbc_4_device_pid": 0xFFFB,
+    "usbc_4_device_class": 0,
+    "usbc_4_device_code": 0,
 }
 
 # Port timers and schedules: all off, except a running 1 h timer on USB-C 1
@@ -136,6 +166,19 @@ STATUS |= {
 }
 
 STOCK_THEME_URL = "https://example.com/stock/celestial.jpg"
+# Anker's signed links to custom images: long (over 255 characters), valid 5 minutes
+SIGNATURE = (
+    "X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=SECRET%2F20260712%2Feu-central-1"
+    "%2Fs3%2Faws4_request&X-Amz-Date=20260712T213013Z&X-Amz-Expires=300"
+    f"&X-Amz-SignedHeaders=host&X-Amz-Signature={'3b' * 64}"
+)
+# the link in the cloud's custom image list (expired by the time it is used)
+FIREWORKS_URL = f"{S3_URL}/custom/fw.jpg?{SIGNATURE}"
+
+
+def fresh_link(short_url: str) -> str:
+    """The fresh signed link the cloud gives for a custom image's path."""
+    return f"{S3_URL}{short_url}?fresh&{SIGNATURE}"
 
 
 def _port_setting(name: str, power: int, max_power: int, **protocols: int) -> dict:
@@ -238,7 +281,7 @@ CLOUD = {
         "list": [
             {
                 "id": 38820,
-                "img_url": "https://example.com/custom/fw.jpg?X-Amz-Credential=SECRET",
+                "img_url": FIREWORKS_URL,
                 "short_url": "/custom/fw.jpg",
                 "hash_code": "0x14edd612",
                 "name": "Fireworks",
@@ -313,6 +356,8 @@ class FakeMqttSession:
         self.port = 8883
         self.connected = True
         self.subscriptions: set[str] = set()
+        # paho's error code for the next subscription (0: success)
+        self.subscribe_error = 0
         self.published: list[str] = []
         # What the charger answers to the next published message (None = silent)
         self.pending_reply: dict[str, Any] | None = dict(STATUS)
@@ -351,8 +396,11 @@ class FakeMqttSession:
     def get_topic_prefix(self, deviceDict: dict, publish: bool = False) -> str:
         return f"dt/anker_power/A2345/{deviceDict['device_sn']}/"
 
-    def subscribe(self, topic: str) -> None:
-        self.subscriptions.add(topic)
+    def subscribe(self, topic: str) -> int:
+        """As the library once connected: paho's error code, 0 on success."""
+        if not self.subscribe_error:
+            self.subscriptions.add(topic)
+        return self.subscribe_error
 
     def publish(self, deviceDict: dict, hexbytes: str, encoding_type: Any = None):
         self.published.append(hexbytes)
@@ -378,6 +426,7 @@ class FakeCloud:
         self.auth_error: Exception | None = None
         self.bind_error: Exception | None = None
         self.charger_silent = False
+        self.subscribe_error = 0  # paho's error code for the MQTT subscription
         self.account_country = "SG"
         self.apis: list[AnkerSolixApi] = []
         # REST answers by endpoint key; an exception value is raised instead
@@ -458,7 +507,9 @@ class FakeCloud:
             images[:] = [i for i in images if i["id"] != payload["id"]]
             return ok
         if key.endswith("style/get_url"):
-            return ok | {"data": {"url": f"{S3_URL}{payload['short_url']}?fresh"}}
+            if isinstance(error := self.rest.get(key), Exception):
+                raise error
+            return ok | {"data": {"url": fresh_link(payload["short_url"])}}
         return self.rest[key]
 
     @property
@@ -499,6 +550,7 @@ class FakeCloud:
             )
             if self.charger_silent:
                 api.mqttsession.pending_reply = None
+            api.mqttsession.subscribe_error = self.subscribe_error
             for dev in api.devices.values():
                 dev.setdefault("mqtt_data", {})
             return api.mqttsession

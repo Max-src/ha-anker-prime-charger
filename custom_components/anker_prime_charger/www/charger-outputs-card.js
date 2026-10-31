@@ -2,8 +2,9 @@
  * Charger outputs card: the power of each port, as the Anker app shows it
  * below the charger: a "USB-C Output" panel (C1-C4) and a "USB-A Output"
  * panel (A1, A2). A port with a device plugged in has a coloured label and
- * shows its power, voltage and current; the others show "--". Tapping a port
- * opens its power sensor.
+ * shows its power, voltage and current, and on USB-C the device's brand once
+ * the charger identifies it; the others show "--". Tapping a port opens its
+ * power sensor.
  *
  *   type: custom:anker-prime-charger-outputs-card
  *   device: <the charger's device id>   # optional: the first charger
@@ -75,6 +76,7 @@ class ChargerOutputsCard extends ChargerCard {
             ${formatNumber(hass, port.volts)}V / ${formatNumber(hass, port.amps)}A
           </span>`
         : ""}
+      ${port.deviceName ? html`<span class="device">${port.deviceName}</span>` : ""}
     </div>`;
   }
 
@@ -177,6 +179,14 @@ class ChargerOutputsCard extends ChargerCard {
       .details {
         color: var(--secondary-text-color);
         font-size: 0.95em;
+        white-space: nowrap;
+      }
+      .device {
+        color: var(--secondary-text-color);
+        font-size: 0.85em;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
       }
     `,

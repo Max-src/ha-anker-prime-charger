@@ -148,6 +148,17 @@ async def test_unchanged_messages_dont_update_entities(
     unsub()
 
 
+async def test_mqtt_subscription_failure_retries(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """A subscription paho refuses fails the setup, which Home Assistant retries."""
+    cloud.subscribe_error = 4  # MQTT_ERR_NO_CONN
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert "failed: 4" in entry.reason
+
+
 async def test_mqtt_reconnects_after_disconnect(
     hass: HomeAssistant,
     cloud: FakeCloud,

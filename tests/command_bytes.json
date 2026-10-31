@@ -1,0 +1,1523 @@
+{
+ "_about": "Every distinct command the integration sends (from the test suite), with the bytes the charger accepts: built by the library the integration ran on the charger before the October 2026 library update, timestamps left out. tests/test_command_bytes.py checks the library still builds them. Regenerate only after checking a change on a real charger.",
+ "status": {
+  "clock_display_end_hour": 22,
+  "clock_display_end_minute": 30,
+  "clock_display_start_hour": 7,
+  "clock_display_start_minute": 0,
+  "clock_display_weekdays": 31,
+  "clock_settings": 195,
+  "clock_switch": 1,
+  "holiday_switch": 1,
+  "theme_id": 948897111,
+  "usba_end_hour": 0,
+  "usba_end_minute": 0,
+  "usba_end_switch": 0,
+  "usba_end_weekdays": 0,
+  "usba_start_hour": 7,
+  "usba_start_minute": 30,
+  "usba_start_switch": 1,
+  "usba_start_weekdays": 31,
+  "usba_timer_seconds": 0,
+  "usba_timer_switch": 0,
+  "usbc_1_end_hour": 0,
+  "usbc_1_end_minute": 0,
+  "usbc_1_end_switch": 0,
+  "usbc_1_end_weekdays": 0,
+  "usbc_1_start_hour": 0,
+  "usbc_1_start_minute": 0,
+  "usbc_1_start_switch": 0,
+  "usbc_1_start_weekdays": 0,
+  "usbc_1_timer_seconds": 3600,
+  "usbc_1_timer_switch": 1,
+  "usbc_2_end_hour": 0,
+  "usbc_2_end_minute": 0,
+  "usbc_2_end_switch": 0,
+  "usbc_2_end_weekdays": 0,
+  "usbc_2_start_hour": 0,
+  "usbc_2_start_minute": 0,
+  "usbc_2_start_switch": 0,
+  "usbc_2_start_weekdays": 0,
+  "usbc_2_timer_seconds": 0,
+  "usbc_2_timer_switch": 0,
+  "usbc_3_end_hour": 0,
+  "usbc_3_end_minute": 0,
+  "usbc_3_end_switch": 0,
+  "usbc_3_end_weekdays": 0,
+  "usbc_3_start_hour": 0,
+  "usbc_3_start_minute": 0,
+  "usbc_3_start_switch": 0,
+  "usbc_3_start_weekdays": 0,
+  "usbc_3_timer_seconds": 0,
+  "usbc_3_timer_switch": 0,
+  "usbc_4_end_hour": 0,
+  "usbc_4_end_minute": 0,
+  "usbc_4_end_switch": 0,
+  "usbc_4_end_weekdays": 0,
+  "usbc_4_start_hour": 0,
+  "usbc_4_start_minute": 0,
+  "usbc_4_start_switch": 0,
+  "usbc_4_start_weekdays": 0,
+  "usbc_4_timer_seconds": 0,
+  "usbc_4_timer_switch": 0
+ },
+ "commands": [
+  {
+   "command": "theme_request",
+   "messages": [
+    {
+     "type": "0202",
+     "fields": {
+      "a1": "22"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme_custom",
+   "parameters": {
+    "set_clock_switch": "on",
+    "set_holiday_switch": "on",
+    "set_theme_type": "custom",
+    "set_theme_id": 47834,
+    "set_theme_hash": 1587623873,
+    "set_theme_url": "https://edge-aiot-ohi-prod.s3.example.com/anker_power/edge/screen_saver/test/1.cropped_image.jpg?sig"
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "01c5",
+      "a3": "03daba0000",
+      "a4": "03c137a15e",
+      "a5": "03ffffffff",
+      "a7": "0468747470733a2f2f656467652d61696f742d6f68692d70726f642e73332e6578616d706c652e636f6d2f616e6b65725f706f7765722f656467652f73637265656e5f73617665722f746573742f312e63726f707065645f696d6167652e6a70673f736967"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme_custom",
+   "parameters": {
+    "set_clock_switch": "on",
+    "set_holiday_switch": "on",
+    "set_theme_type": "custom",
+    "set_theme_id": 38820,
+    "set_theme_hash": 351131154,
+    "set_theme_url": "https://edge-aiot-ohi-prod.s3.example.com/anker_power/edge/screen_saver/2026/07/12/4444444444444444444444444444444444444444/NA7sOGF4.cropped_image.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=SECRET%2F20260712%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Date=20260712T213013Z&X-Amz-Expires=300&X-Amz-SignedHeaders=host&X-Amz-Signature=3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b"
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "01c5",
+      "a3": "03a4970000",
+      "a4": "0312d6ed14",
+      "a5": "03ffffffff",
+      "a7": "0468747470733a2f2f656467652d61696f742d6f68692d70726f642e73332e6578616d706c652e636f6d2f616e6b65725f706f7765722f656467652f73637265656e5f73617665722f323032362f30372f31322f343434343434343434343434343434343434343434343434343434343434343434343434343434342f4e4137734f4746342e63726f707065645f696d6167652e6a70673f582d416d7a2d416c676f726974686d3d415753342d484d41432d53484132353626582d416d7a2d43726564656e7469616c3d534543524554253246323032363037313225324665752d63656e7472616c2d312532467333253246617773345f7265717565737426582d416d7a2d446174653d3230323630373132543231333031335a26582d416d7a2d457870697265733d33303026582d416d7a2d5369676e6564486561646572733d686f737426582d416d7a2d5369676e61747572653d33623362336233623362336233623362336233623362336233623362336233623362336233623362336233623362336233623362336233623362336233623362"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme",
+   "parameters": {
+    "set_clock_switch": "on",
+    "set_holiday_switch": "on",
+    "set_theme_type": "theme_1",
+    "set_theme_id": 4,
+    "set_theme_hash": 0,
+    "set_theme_url": "assets/img/shared/icl_a2345_theme1.png"
+   },
+   "status": {
+    "clock_settings": 197,
+    "theme_id": 38820
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "01c0",
+      "a3": "0304000000",
+      "a4": "0300000000",
+      "a5": "03ffffffff",
+      "a6": "046173736574732f696d672f7368617265642f69636c5f61323334355f7468656d65312e706e67"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_1_port_switch",
+   "value": "off",
+   "parameter": "set_port_switch",
+   "parameters": {
+    "set_port_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "0207",
+     "fields": {
+      "a1": "22",
+      "a2": "0100",
+      "a3": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_port_switch",
+   "value": "off",
+   "parameter": "set_port_switch",
+   "parameters": {
+    "set_port_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "0207",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_port_switch",
+   "value": "on",
+   "parameter": "set_port_switch",
+   "parameters": {
+    "set_port_switch": "on"
+   },
+   "messages": [
+    {
+     "type": "0207",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_usage_mode",
+   "value": "low_power",
+   "parameter": "set_usage_mode",
+   "parameters": {
+    "set_usage_mode": "low_power"
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0104"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_timeout_mode_select",
+   "value": "300",
+   "parameter": "set_display_timeout_mode",
+   "parameters": {
+    "set_display_timeout_mode": "300"
+   },
+   "messages": [
+    {
+     "type": "0203",
+     "fields": {
+      "a1": "22",
+      "a2": "0103"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_usage_mode",
+   "value": "ai_power",
+   "parameter": "set_usage_mode",
+   "parameters": {
+    "set_usage_mode": "ai_power"
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "knob_mode_select",
+   "value": "backward",
+   "parameter": "set_knob_mode",
+   "parameters": {
+    "set_knob_mode": "backward"
+   },
+   "messages": [
+    {
+     "type": "020e",
+     "fields": {
+      "a1": "22",
+      "a2": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_mode_select",
+   "value": "12h",
+   "parameter": "set_clock_mode",
+   "parameters": {
+    "set_clock_mode": "12h"
+   },
+   "messages": [
+    {
+     "type": "0210",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "port_priority",
+   "value": "c3_c4",
+   "parameter": "set_port_priority",
+   "parameters": {
+    "set_port_priority": "c3_c4"
+   },
+   "messages": [
+    {
+     "type": "020c",
+     "fields": {
+      "a1": "22",
+      "a2": "010c"
+     }
+    }
+   ]
+  },
+  {
+   "command": "port_priority",
+   "value": "off",
+   "parameter": "set_port_priority",
+   "parameters": {
+    "set_port_priority": "off"
+   },
+   "messages": [
+    {
+     "type": "020c",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_brightness",
+   "value": 45,
+   "parameter": "set_display_brightness",
+   "parameters": {
+    "set_display_brightness": 45
+   },
+   "messages": [
+    {
+     "type": "0204",
+     "fields": {
+      "a1": "22",
+      "a2": "012d"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_holiday_switch",
+   "value": "off",
+   "parameter": "set_holiday_switch",
+   "parameters": {
+    "set_holiday_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "020f",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme",
+   "parameters": {
+    "set_clock_switch": "off",
+    "set_holiday_switch": "on",
+    "set_theme_type": "stock",
+    "set_theme_id": 948897111,
+    "set_theme_hash": 1083261735,
+    "set_theme_url": "https://example.com/stock/celestial.jpg"
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "0143",
+      "a3": "0357058f38",
+      "a4": "0327439140",
+      "a5": "03ffffffff",
+      "a6": "0468747470733a2f2f6578616d706c652e636f6d2f73746f636b2f63656c65737469616c2e6a7067"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_time_switch",
+   "value": "off",
+   "parameter": "set_clock_time_switch",
+   "parameters": {
+    "set_clock_time_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "0222",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_time_switch",
+   "value": "on",
+   "parameter": "set_clock_time_switch",
+   "parameters": {
+    "set_clock_time_switch": "on"
+   },
+   "messages": [
+    {
+     "type": "0222",
+     "fields": {
+      "a1": "22",
+      "a2": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme",
+   "parameters": {
+    "set_clock_switch": "on",
+    "set_holiday_switch": "on",
+    "set_theme_type": "stock",
+    "set_theme_id": 938963984,
+    "set_theme_hash": 3173899431,
+    "set_theme_url": "https://example.com/stock/lunar.jpg"
+   },
+   "status": {
+    "clock_settings": 197,
+    "theme_id": 38820
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "01c3",
+      "a3": "031074f737",
+      "a4": "03a7dc2dbd",
+      "a5": "03ffffffff",
+      "a6": "0468747470733a2f2f6578616d706c652e636f6d2f73746f636b2f6c756e61722e6a7067"
+     }
+    }
+   ]
+  },
+  {
+   "command": "display_theme",
+   "parameters": {
+    "set_clock_switch": "on",
+    "set_holiday_switch": "on",
+    "set_theme_type": "theme_2",
+    "set_theme_id": 4,
+    "set_theme_hash": 0,
+    "set_theme_url": "assets/img/a2345/icl_a2345_theme2.png"
+   },
+   "messages": [
+    {
+     "type": "0205",
+     "fields": {
+      "a1": "22",
+      "a2": "01c1",
+      "a3": "0304000000",
+      "a4": "0300000000",
+      "a5": "03ffffffff",
+      "a6": "046173736574732f696d672f61323334352f69636c5f61323334355f7468656d65322e706e67"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": 0,
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_power_limit": 15,
+    "set_usb_c4_protocols": [],
+    "set_usb_a_power_limit": 15
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04020000000000000000000000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_display_schedule",
+   "parameters": {
+    "set_clock_display_start_hour": 8,
+    "set_clock_display_start_minute": 15,
+    "set_clock_display_end_hour": 22,
+    "set_clock_display_end_minute": 30,
+    "set_clock_display_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0213",
+     "fields": {
+      "a1": "22",
+      "a2": "04080f161e1f"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_display_schedule",
+   "parameters": {
+    "set_clock_display_start_hour": 8,
+    "set_clock_display_start_minute": 15,
+    "set_clock_display_end_hour": 22,
+    "set_clock_display_end_minute": 30,
+    "set_clock_display_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "status": {
+    "clock_display_start_hour": 8,
+    "clock_display_start_minute": 15,
+    "clock_display_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0213",
+     "fields": {
+      "a1": "22",
+      "a2": "04080f161e60"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_display_schedule",
+   "parameters": {
+    "set_clock_display_start_hour": 8,
+    "set_clock_display_start_minute": 15,
+    "set_clock_display_end_hour": 22,
+    "set_clock_display_end_minute": 30,
+    "set_clock_display_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ]
+   },
+   "status": {
+    "clock_display_start_hour": 8,
+    "clock_display_start_minute": 15,
+    "clock_display_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0213",
+     "fields": {
+      "a1": "22",
+      "a2": "04080f161e7f"
+     }
+    }
+   ]
+  },
+  {
+   "command": "device_id_switch",
+   "value": "on",
+   "parameter": "set_device_id_switch",
+   "parameters": {
+    "set_device_id_switch": "on"
+   },
+   "messages": [
+    {
+     "type": "0223",
+     "fields": {
+      "a1": "22",
+      "a2": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "compatibility_switch",
+   "value": "off",
+   "parameter": "set_compatibility_switch",
+   "parameters": {
+    "set_compatibility_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "0214",
+     "fields": {
+      "a1": "22",
+      "a2": "0101"
+     }
+    }
+   ]
+  },
+  {
+   "command": "compatibility_switch",
+   "value": "on",
+   "parameter": "set_compatibility_switch",
+   "parameters": {
+    "set_compatibility_switch": "on"
+   },
+   "messages": [
+    {
+     "type": "0214",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "custom_charging_mode_switch",
+   "value": "off",
+   "parameter": "set_custom_charging_mode",
+   "parameters": {
+    "set_custom_charging_mode": "off"
+   },
+   "messages": [
+    {
+     "type": "0211",
+     "fields": {
+      "a1": "22",
+      "a2": "0100"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 60,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100643c000f0f",
+      "a4": "04020000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 0,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "0401006400000f0f",
+      "a4": "04020000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 24,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f18",
+      "a4": "04020000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "on",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040101641e000f0f",
+      "a4": "04020000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_2_port_timer",
+   "parameters": {
+    "set_port_timer_switch": "on",
+    "set_port_timer_seconds": 3600
+   },
+   "messages": [
+    {
+     "type": "0209",
+     "fields": {
+      "a1": "22",
+      "a2": "0101",
+      "a3": "0401100e0000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_1_port_timer",
+   "parameters": {
+    "set_port_timer_switch": "on",
+    "set_port_timer_seconds": 5400
+   },
+   "messages": [
+    {
+     "type": "0209",
+     "fields": {
+      "a1": "22",
+      "a2": "0100",
+      "a3": "040118150000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_1_port_timer",
+   "parameters": {
+    "set_port_timer_switch": "on",
+    "set_port_timer_seconds": 420
+   },
+   "status": {
+    "usbc_1_timer_seconds": 5400
+   },
+   "messages": [
+    {
+     "type": "0209",
+     "fields": {
+      "a1": "22",
+      "a2": "0100",
+      "a3": "0401a4010000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 8,
+    "set_port_time_minute": 15,
+    "set_port_time_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301080f1f"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 8,
+    "set_port_time_minute": 15,
+    "set_port_time_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "status": {
+    "usba_start_hour": 8,
+    "usba_start_minute": 15,
+    "usba_start_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301080f60"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_3_end_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 0,
+    "set_port_time_minute": 0,
+    "set_port_time_weekdays": []
+   },
+   "status": {
+    "usba_start_hour": 8,
+    "usba_start_minute": 15,
+    "usba_start_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0102",
+      "a3": "0100",
+      "a4": "0301000000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 7,
+    "set_port_time_minute": 30,
+    "set_port_time_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301071e60"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 7,
+    "set_port_time_minute": 30,
+    "set_port_time_weekdays": [
+     "mon",
+     "wed"
+    ]
+   },
+   "status": {
+    "usba_start_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301071e05"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 7,
+    "set_port_time_minute": 30,
+    "set_port_time_weekdays": [
+     "mon",
+     "tue",
+     "wed",
+     "thu",
+     "fri",
+     "sat",
+     "sun"
+    ]
+   },
+   "status": {
+    "usba_start_weekdays": [
+     "mon",
+     "wed"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301071e7f"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 7,
+    "set_port_time_minute": 30,
+    "set_port_time_weekdays": [
+     "sun"
+    ]
+   },
+   "status": {
+    "usba_start_weekdays": [
+     "sat",
+     "sun"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301071e40"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_2_end_time",
+   "parameters": {
+    "set_port_time_switch": "off",
+    "set_port_time_hour": 0,
+    "set_port_time_minute": 0,
+    "set_port_time_weekdays": [
+     "mon",
+     "wed",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0101",
+      "a3": "0100",
+      "a4": "0300000015"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_2_end_time",
+   "parameters": {
+    "set_port_time_switch": "off",
+    "set_port_time_hour": 0,
+    "set_port_time_minute": 0,
+    "set_port_time_weekdays": []
+   },
+   "status": {
+    "usbc_2_end_weekdays": [
+     "mon",
+     "wed",
+     "fri"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0101",
+      "a3": "0100",
+      "a4": "0300000000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "clock_display_schedule",
+   "parameters": {
+    "set_clock_display_start_hour": 7,
+    "set_clock_display_start_minute": 0,
+    "set_clock_display_end_hour": 22,
+    "set_clock_display_end_minute": 30,
+    "set_clock_display_weekdays": [
+     "sun"
+    ]
+   },
+   "status": {
+    "usbc_2_end_weekdays": []
+   },
+   "messages": [
+    {
+     "type": "0213",
+     "fields": {
+      "a1": "22",
+      "a2": "040700161e40"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usba_start_time",
+   "parameters": {
+    "set_port_time_switch": "on",
+    "set_port_time_hour": 7,
+    "set_port_time_minute": 30,
+    "set_port_time_weekdays": [
+     "sat"
+    ]
+   },
+   "status": {
+    "clock_display_weekdays": [
+     "sun"
+    ],
+    "usbc_2_end_weekdays": []
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0104",
+      "a3": "0101",
+      "a4": "0301071e20"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_3_start_time",
+   "parameters": {
+    "set_port_time_switch": "off",
+    "set_port_time_hour": 0,
+    "set_port_time_minute": 0,
+    "set_port_time_weekdays": [
+     "sat"
+    ]
+   },
+   "status": {
+    "clock_display_weekdays": [
+     "sun"
+    ],
+    "usba_start_weekdays": [
+     "sat"
+    ],
+    "usbc_2_end_weekdays": []
+   },
+   "messages": [
+    {
+     "type": "0208",
+     "fields": {
+      "a1": "22",
+      "a2": "0102",
+      "a3": "0101",
+      "a4": "0300000020"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "scp",
+     "ufcs",
+     "pps20v"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04230000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04000000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "scp",
+     "ufcs",
+     "pps16v"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04130000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 30,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "scp",
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "0401001e1e000f0f",
+      "a4": "04030000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "scp",
+     "ufcs",
+     "pd12v",
+     "pps11v",
+     "pps16v",
+     "pps20v",
+     "xiaomi"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04bf0000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 30,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "scp",
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100641e000f0f",
+      "a4": "04030000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "realtime_trigger",
+   "parameters": {
+    "": null
+   },
+   "messages": [
+    {
+     "type": "020b",
+     "fields": {
+      "a1": "22"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "on",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 45,
+    "set_usb_c3_power_limit": 20,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [
+     "scp",
+     "ufcs"
+    ],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040101642d140f0f",
+      "a4": "04020000030000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 45,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [
+     "ufcs"
+    ],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100642d000f0f",
+      "a4": "04020000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 45,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": [
+     "ufcs"
+    ]
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100642d000f0f",
+      "a4": "04000000000000000000020000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "charger_custom_usage_mode",
+   "parameters": {
+    "set_custom_profile_number": 1,
+    "set_auto_exit_switch": "off",
+    "set_usb_c1_power_limit": 100,
+    "set_usb_c2_power_limit": 45,
+    "set_usb_c3_power_limit": 0,
+    "set_usb_c4_power_limit": 15,
+    "set_usb_a_power_limit": 15,
+    "set_usb_c1_protocols": [],
+    "set_usb_c2_protocols": [],
+    "set_usb_c3_protocols": [],
+    "set_usb_c4_protocols": []
+   },
+   "messages": [
+    {
+     "type": "0206",
+     "fields": {
+      "a1": "22",
+      "a2": "0105",
+      "a3": "040100642d000f0f",
+      "a4": "04000000000000000000000000"
+     }
+    }
+   ]
+  },
+  {
+   "command": "usbc_4_port_switch",
+   "value": "off",
+   "parameter": "set_port_switch",
+   "parameters": {
+    "set_port_switch": "off"
+   },
+   "messages": [
+    {
+     "type": "0207",
+     "fields": {
+      "a1": "22",
+      "a2": "0103",
+      "a3": "0100"
+     }
+    }
+   ]
+  }
+ ]
+}

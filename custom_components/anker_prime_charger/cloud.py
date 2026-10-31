@@ -146,6 +146,22 @@ class CloudSettings:
         )
         self.generation += 1
 
+    async def async_fresh_link(self, path: str) -> str | None:
+        """A fresh link to the custom image stored at this path, or None.
+
+        The cloud's links to custom images expire after 5 minutes.
+        """
+        if not path:
+            return None
+        try:
+            answer = await library.async_request(
+                self.api, "theme_url", {"short_url": path}
+            )
+        except CLOUD_ERRORS:
+            return None
+        url = answer.get("url")
+        return url if isinstance(url, str) else None
+
     def custom_id_of(self, path: str) -> int | None:
         """The id of the custom image stored at this path."""
         return next((int(i) for i, p in self.custom_paths.items() if p == path), None)

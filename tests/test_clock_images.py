@@ -20,7 +20,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.setup import async_setup_component
 
-from .conftest import S3_URL, FakeCloud
+from .conftest import S3_URL, FakeCloud, fresh_link
 from .helpers import attr, device_id, entity_id, state
 
 
@@ -97,7 +97,7 @@ async def test_add_clock_image(
 
     # listed right away, and shown on the charger (theme kind custom)
     assert "Custom - Beach" in custom_options(hass)
-    assert commands[-1][0] == "charger_theme_custom"
+    assert commands[-1][0] == "display_theme_custom"
     assert commands[-1][1]["set_theme_id"] == 47834
 
 
@@ -199,8 +199,8 @@ async def test_delete_clock_image(
     assert state(hass, "select", "theme_id") == "Custom - Fireworks"
     sent = len(commands)
     await act(hass, "delete_clock_image", image="Fireworks")
-    assert commands[sent][0] == "charger_theme"
-    assert commands[sent][1]["set_theme_type"] == "style_1"
+    assert commands[sent][0] == "display_theme"
+    assert commands[sent][1]["set_theme_type"] == "theme_1"
     assert "Custom - Fireworks" not in custom_options(hass)
     assert state(hass, "select", "theme_id") == "Standard Style - Theme 1"
 
@@ -228,13 +228,13 @@ async def test_list_clock_images(
             "id": 38820,
             "name": "Fireworks",
             "option": "Custom - Fireworks",
-            "preview_url": f"{S3_URL}/custom/fw.jpg?fresh",
+            "preview_url": fresh_link("/custom/fw.jpg"),
         },
         {
             "id": 47833,
             "name": "Custom 2",
             "option": "Custom - Custom 2",
-            "preview_url": f"{S3_URL}/custom/x.jpg?fresh",
+            "preview_url": fresh_link("/custom/x.jpg"),
         },
     ]
 

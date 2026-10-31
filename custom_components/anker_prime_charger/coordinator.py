@@ -29,6 +29,8 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, Final
 
+from paho.mqtt.client import MQTT_ERR_SUCCESS
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -140,7 +142,8 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.mqtt_device = SolixMqttDeviceCharger(self.api, self.device_sn)
         if not self.mqtt_device.is_subscribed():
             topic = f"{session.get_topic_prefix(deviceDict=self.device)}#"
-            if (reason := session.subscribe(topic)) is not None:
+            # the paho error code once connected, None if subscribed on connecting
+            if (reason := session.subscribe(topic)) not in (None, MQTT_ERR_SUCCESS):
                 raise translated(
                     UpdateFailed, "mqtt_subscribe_failed", topic=topic, reason=reason
                 )
@@ -169,9 +172,10 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _async_mqtt_message(
         self, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> None:
-        """Let the library store the values it knows, then add ours.
+        """Let the library store the values it keeps, then add ours.
 
-        Values decoded thanks to mqtt_extensions.py are dropped by the library.
+        The library's cache update drops some values it decodes (see
+        mqtt_extensions.EXTRA_STATE_KEYS).
         """
         self._in_message, self._message_changed = True, False
         try:

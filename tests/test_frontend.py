@@ -23,7 +23,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.http import KEY_HASS
 from homeassistant.setup import async_setup_component
 
-from .conftest import S3_URL, STOCK_THEME_URL, FakeCloud
+from .conftest import STOCK_THEME_URL, FakeCloud, fresh_link
 from .helpers import device_id, entity_id
 
 
@@ -56,6 +56,11 @@ async def test_command_gives_the_ports_entities(
     assert a2["connected"] == entity_id(hass, "binary_sensor", "usba_2_status")
     for reading in ("power", "voltage", "current"):
         assert a2[reading] == entity_id(hass, "sensor", f"usba_2_{reading}")
+    # the connected device: USB-C only
+    assert a2["device"] is None
+    assert result["ports"][0]["device"] == entity_id(
+        hass, "sensor", "usbc_1_connected_device"
+    )
 
 
 async def test_command_gives_the_screen_entities(
@@ -122,7 +127,7 @@ async def test_screensaver_picture_is_kept(
     aioclient_mock.get(
         STOCK_THEME_URL, content=b"stock", headers={"Content-Type": "image/jpeg"}
     )
-    aioclient_mock.get(f"{S3_URL}/custom/x.jpg?fresh", content=b"custom")
+    aioclient_mock.get(fresh_link("/custom/x.jpg"), content=b"custom")
     client = await hass_client()
     url = f"/api/anker_prime_charger/screensaver_image/{device_id(hass)}"
 
