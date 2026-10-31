@@ -421,16 +421,22 @@ above, see [docs/DOCUMENTATION_SCREENSHOTS.md](docs/DOCUMENTATION_SCREENSHOTS.md
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-turned.png" alt="Anker Prime Charger 3D: Turned by dragging: the right side and the back" width="280"><br>Turned by dragging: the right side and the back</td>
   </tr>
   <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-controls.png" alt="Anker Prime Charger 3D: With zoom and turn buttons" width="280"><br>With zoom and turn buttons</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-hover.png" alt="Anker Prime Charger 3D: A port under the mouse: what a tap opens" width="280"><br>A port under the mouse: what a tap opens</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-no-cables.png" alt="Anker Prime Charger 3D: Without cables: the ports in use are lit" width="280"><br>Without cables: the ports in use are lit</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-no-port-power.png" alt="Anker Prime Charger 3D: Without each port&#39;s power" width="280"><br>Without each port&#39;s power</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-flip.png" alt="Anker Prime Charger 3D: Clock screensaver: Standard Style 1" width="280"><br>Clock screensaver: Standard Style 1</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-digits.png" alt="Anker Prime Charger 3D: Clock screensaver: Standard Style 2" width="280"><br>Clock screensaver: Standard Style 2</td>
-    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-ring.png" alt="Anker Prime Charger 3D: Clock screensaver: Standard Style 3" width="280"><br>Clock screensaver: Standard Style 3</td>
   </tr>
   <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-ring.png" alt="Anker Prime Charger 3D: Clock screensaver: Standard Style 3" width="280"><br>Clock screensaver: Standard Style 3</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screensaver-image.png" alt="Anker Prime Charger 3D: Clock screensaver: an image, with the time (12h)" width="280"><br>Clock screensaver: an image, with the time (12h)</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-screen-off.png" alt="Anker Prime Charger 3D: The screen off" width="280"><br>The screen off</td>
-    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-dark.png" alt="Anker Prime Charger 3D: Dark theme" width="280"><br>Dark theme</td>
   </tr>
   <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-dark.png" alt="Anker Prime Charger 3D: Dark theme" width="280"><br>Dark theme</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-offline.png" alt="Anker Prime Charger 3D: The charger offline" width="280"><br>The charger offline</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/3d-narrow.png" alt="Anker Prime Charger 3D: A narrow column (a phone)" width="280"><br>A narrow column (a phone)</td>
   </tr>
@@ -450,10 +456,14 @@ Its visual editor:
   <tr>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-overview.png" alt="Anker Prime Charger outputs: Three devices charging" width="280"><br>Three devices charging</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-compact.png" alt="Anker Prime Charger outputs: Without voltage and current" width="280"><br>Without voltage and current</td>
-    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-dark.png" alt="Anker Prime Charger outputs: Dark theme" width="280"><br>Dark theme</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-switches.png" alt="Anker Prime Charger outputs: With on/off buttons (C4 switched off)" width="280"><br>With on/off buttons (C4 switched off)</td>
   </tr>
   <tr>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-hover.png" alt="Anker Prime Charger outputs: A port under the mouse: what a tap opens" width="280"><br>A port under the mouse: what a tap opens</td>
+    <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-dark.png" alt="Anker Prime Charger outputs: Dark theme" width="280"><br>Dark theme</td>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-offline.png" alt="Anker Prime Charger outputs: The charger offline" width="280"><br>The charger offline</td>
+  </tr>
+  <tr>
     <td valign="top"><img src="https://raw.githubusercontent.com/Max-src/ha-anker-prime-charger/main/images/cards/outputs-narrow.png" alt="Anker Prime Charger outputs: A narrow column (a phone)" width="280"><br>A narrow column (a phone)</td>
   </tr>
 </table>
