@@ -48,6 +48,28 @@
           "pitch": 30
         }
       },
+      "controls": {
+        "title": "With zoom and turn buttons",
+        "config": {
+          "show_controls": true
+        }
+      },
+      "hover": {
+        "title": "A port under the mouse: what a tap opens",
+        "hover": "c1"
+      },
+      "no-cables": {
+        "title": "Without cables: the ports in use are lit",
+        "config": {
+          "show_cables": false
+        }
+      },
+      "no-port-power": {
+        "title": "Without each port's power",
+        "config": {
+          "show_port_power": false
+        }
+      },
       "screensaver-flip": {
         "title": "Clock screensaver: Standard Style 1",
         "config": {
@@ -121,6 +143,16 @@
         "config": {
           "show_details": false
         }
+      },
+      "switches": {
+        "title": "With on/off buttons (C4 switched off)",
+        "config": {
+          "show_switches": true
+        }
+      },
+      "hover": {
+        "title": "A port under the mouse: what a tap opens",
+        "hover": "c1"
       },
       "dark": {
         "title": "Dark theme",

@@ -14,6 +14,12 @@
  * perspective at their place (accurate at their size). Surfaces facing away
  * from the camera are skipped; the rest are drawn back to front, each shaded
  * by how much it faces the light.
+ *
+ * What belongs to a port (its opening, its power, its cable) carries the
+ * port's id (data-port="c1"); with `tappable`, each port also gets an
+ * invisible, focusable area around it and its power (class "hit"), larger
+ * than the port so that it is easy to tap. The `hovered` port's area is
+ * tinted and its cable outlined: what a tap would open.
  */
 import { css, svg } from "./lib/lit-all.js";
 import { SCREEN } from "./charger-screensaver.js";
@@ -40,6 +46,11 @@ const KNOB = { u: 25, v: H * 0.55, radius: 11, height: 6 };
 const USB_A = { ids: ["a1", "a2"], u: [67, 104], v: H * 0.55, width: 22, height: 9 };
 // Each USB-A port's power, on the side just above it
 const SIDE_POWER = { v: USB_A.v - 13 };
+// The tap areas: from above a port's power to below the port (2D, mm)
+const HIT = {
+  front: { width: USB_C.gap - 3, top: POWER_PAGE.port - 6, bottom: H - 3 },
+  side: { width: 34, top: SIDE_POWER.v - 6, bottom: USB_A.v + USB_A.height / 2 + 4 },
+};
 // Plugs: their size around the port, length, narrowing; cords
 // Plugs (like Apple's braided cables): a soft white housing with rounded
 // edges, out of a thin metal collar; its size around the port, length,
@@ -225,13 +236,28 @@ function face(view, s, details) {
 }
 
 /** A port's opening on a surface, centred at (u, v). */
-function port(view, s, u, v, width, height, radius, active) {
+function port(view, s, id, u, v, width, height, radius, active) {
   // on the side's metal (not the front's glass): a dark rim
   const classes = ["port", active ? "active" : "", s === RIGHT ? "side" : ""];
   return svg`<rect
     class=${classes.join(" ")}
+    data-port=${id}
     transform=${placement(view, s, u, v)}
     x=${u - width / 2} y=${v - height / 2} width=${width} height=${height} rx=${radius}
+  />`;
+}
+
+/** A port's tap area on a surface, around (u, v) from `top` to `bottom`. */
+function hitArea(view, s, id, u, { width, top, bottom }, hovered) {
+  const v = (top + bottom) / 2;
+  return svg`<rect
+    class="hit ${id === hovered ? "hover" : ""}"
+    data-port=${id}
+    tabindex="0"
+    role="button"
+    aria-label="${id.toUpperCase()}: power history"
+    transform=${placement(view, s, u, v)}
+    x=${u - width / 2} y=${top} width=${width} height=${bottom - top} rx="3"
   />`;
 }
 
@@ -244,9 +270,10 @@ function display(view, content) {
   </g>`;
 }
 
-/** Text on the front, centred at (u, v). */
-function frontText(view, cls, u, v, value) {
-  return svg`<text class=${cls} transform=${placement(view, FRONT, u, v)} x=${u} y=${v}>${value}</text>`;
+/** Text on the front, centred at (u, v) (`port`: the port it belongs to). */
+function frontText(view, cls, u, v, value, port = "") {
+  return svg`<text class=${cls} data-port=${port} transform=${placement(view, FRONT, u, v)}
+    x=${u} y=${v}>${value}</text>`;
 }
 
 /** What the screen shows (see chargerModel's `screen`), drawn on the glass. */
@@ -260,12 +287,12 @@ function screenContent(view, screen) {
 function usbCPower(view, portPower) {
   return USB_C.ids.map((id, i) =>
     portPower?.[id]
-      ? frontText(view, "port-power", W / 2 + (i - 1.5) * USB_C.gap, POWER_PAGE.port, portPower[id])
+      ? frontText(view, "port-power", W / 2 + (i - 1.5) * USB_C.gap, POWER_PAGE.port, portPower[id], id)
       : "",
   );
 }
 
-function frontFace(view, inUse, screen, portPower) {
+function frontFace(view, inUse, screen, portPower, tappable, hovered) {
   const glass = roundedRect(
     GLASS.inset,
     GLASS.inset - 1,
@@ -274,18 +301,22 @@ function frontFace(view, inUse, screen, portPower) {
     GLASS.radius,
   ).map(([u, v]) => at(FRONT, u, v));
   const ports = USB_C.ids.map((id, i) =>
-    port(view, FRONT, W / 2 + (i - 1.5) * USB_C.gap, USB_C.v, USB_C.width, USB_C.height, USB_C.height / 2, inUse.has(id)),
+    port(view, FRONT, id, W / 2 + (i - 1.5) * USB_C.gap, USB_C.v, USB_C.width, USB_C.height, USB_C.height / 2, inUse.has(id)),
   );
+  const hits = tappable
+    ? USB_C.ids.map((id, i) => hitArea(view, FRONT, id, W / 2 + (i - 1.5) * USB_C.gap, HIT.front, hovered))
+    : "";
   return face(view, FRONT, svg`
     <polygon class="glass" points=${view.screen(glass)} fill=${COLOURS.glass} />
     ${screenContent(view, screen)}
     ${usbCPower(view, portPower)}
     ${ports}
+    ${hits}
   `);
 }
 
 /** The right side's details (its surface is one of the body's strips). */
-function rightDetails(view, inUse, portPower) {
+function rightDetails(view, inUse, portPower, tappable, hovered) {
   const middle = at(RIGHT, D / 2, H / 2);
   if (!view.facing(RIGHT.normal, middle)) return null;
   // the knob: discs stacked out from the side (its edge), then its top
@@ -301,19 +332,22 @@ function rightDetails(view, inUse, portPower) {
     <circle transform=${top} cx=${KNOB.u} cy=${KNOB.v} r=${KNOB.radius - 1.2}
       fill="url(#knob-top)" />`);
   const ports = USB_A.ids.map((id, i) =>
-    port(view, RIGHT, USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, 0.8, inUse.has(id)),
+    port(view, RIGHT, id, USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, 0.8, inUse.has(id)),
   );
   const power = USB_A.ids.map((id, i) => {
     const value = portPower?.[id];
     if (!value) return "";
     const u = USB_A.u[i];
-    return svg`<text class="side-power" transform=${placement(view, RIGHT, u, SIDE_POWER.v)}
+    return svg`<text class="side-power" data-port=${id} transform=${placement(view, RIGHT, u, SIDE_POWER.v)}
       x=${u} y=${SIDE_POWER.v}>${value}</text>`;
   });
+  const hits = tappable
+    ? USB_A.ids.map((id, i) => hitArea(view, RIGHT, id, USB_A.u[i], HIT.side, hovered))
+    : "";
   return {
     // just in front of the side, so drawn over it
     depth: view.project(middle)[2] + 0.01,
-    draw: svg`${ports}${power}${knob}`,
+    draw: svg`${ports}${power}${knob}${hits}`,
   };
 }
 
@@ -426,14 +460,16 @@ const AFTER_BODY = 1e6;
  * edge). Otherwise it is behind: drawn before the body, which hides all of
  * it but what sticks out, and its cord before its plug.
  */
-function cable(view, s, kind, u, v, width, height, spread) {
+function cable(view, s, id, kind, u, v, width, height, spread, hovered) {
   const plug = plugAt(view, s, kind, u, v, width, height);
   const seen = view.facing(s.normal, at(s, u, v));
   const line = cord(view, plug.end, s.normal, spread);
   const depth = view.project(plug.centre)[2];
   return {
     depth: seen ? AFTER_BODY + depth : -AFTER_BODY + depth,
-    draw: seen ? svg`${plug.faces}${line}` : svg`${line}${[...plug.faces].reverse()}`,
+    draw: svg`<g class=${id === hovered ? "hover" : ""} data-port=${id}>
+      ${seen ? svg`${plug.faces}${line}` : svg`${line}${[...plug.faces].reverse()}`}
+    </g>`,
   };
 }
 
@@ -445,30 +481,43 @@ function cable(view, s, kind, u, v, width, height, spread) {
  * 480 x 200 coordinates) or {mode: "off"}; `portPower`: each port's power
  * written above it ({c1: "7.2W", a1: "2.5W"}), whatever the screen shows
  * (none: not written); `zoom`: 1 shows the whole charger, larger is nearer;
- * `cables`: a cable in each port in use (else only the port is lit).
+ * `cables`: a cable in each port in use (else only the port is lit);
+ * `tappable`: each port gets a tap area (see the top of this file);
+ * `hovered`: the id of the port under the mouse, highlighted.
  */
-export function chargerModel({ yaw, pitch, zoom = 1, inUse, screen, portPower, cables = true }) {
+export function chargerModel({
+  yaw,
+  pitch,
+  zoom = 1,
+  inUse,
+  screen,
+  portPower,
+  cables = true,
+  tappable = false,
+  hovered = undefined,
+}) {
   const view = viewer(yaw, pitch);
   const items = [
     ...bodySides(view),
-    frontFace(view, inUse, screen, portPower),
+    frontFace(view, inUse, screen, portPower, tappable, hovered),
     face(view, BACK, ""),
-    rightDetails(view, inUse, portPower),
+    rightDetails(view, inUse, portPower, tappable, hovered),
   ];
   USB_C.ids.forEach((id, i) => {
     if (!cables || !inUse.has(id)) return;
     const u = W / 2 + (i - 1.5) * USB_C.gap;
     // the cords fan out a little, as when they lie on a desk
     const spread = [(i - 1.5) * 18, 0, 0];
-    items.push(cable(view, FRONT, "usb_c", u, USB_C.v, USB_C.width, USB_C.height, spread));
+    items.push(cable(view, FRONT, id, "usb_c", u, USB_C.v, USB_C.width, USB_C.height, spread, hovered));
   });
   USB_A.ids.forEach((id, i) => {
     if (!cables || !inUse.has(id)) return;
     const spread = [0, 0, (0.5 - i) * 20];
-    items.push(cable(view, RIGHT, "usb_a", USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, spread));
+    items.push(cable(view, RIGHT, id, "usb_a", USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, spread, hovered));
   });
   const drawn = items.filter(Boolean).sort((a, b) => a.depth - b.depth);
-  return svg`<svg viewBox=${viewBox(zoom)} xmlns="http://www.w3.org/2000/svg" role="img">
+  return svg`<svg class=${tappable ? "tappable" : ""} viewBox=${viewBox(zoom)}
+    xmlns="http://www.w3.org/2000/svg" role=${tappable ? "group" : "img"}>
     <defs>
       <radialGradient id="knob-top" cx="0.4" cy="0.35" r="0.75">
         <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
@@ -502,6 +551,28 @@ export const modelStyles = css`
     font: 600 8.5px var(--ha-font-family-body, Roboto, sans-serif);
     text-anchor: middle;
     dominant-baseline: middle;
+  }
+  /* a port's tap area: invisible, outlined when focused from the keyboard */
+  .hit {
+    fill: transparent;
+    stroke: none;
+    outline: none;
+  }
+  .hit:focus-visible {
+    stroke: var(--primary-color);
+    stroke-width: 1px;
+  }
+  /* the port under the mouse: what a tap opens */
+  .hit.hover {
+    fill: color-mix(in srgb, var(--primary-color) 22%, transparent);
+    stroke: var(--primary-color);
+    stroke-width: 0.8px;
+  }
+  g.hover {
+    filter: drop-shadow(0 0 1.5px var(--primary-color)) drop-shadow(0 0 1.5px var(--primary-color));
+  }
+  .tappable [data-port]:not([data-port=""]) {
+    cursor: pointer;
   }
   .side-power {
     fill: #2f353c;

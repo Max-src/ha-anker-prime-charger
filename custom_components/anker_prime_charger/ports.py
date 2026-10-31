@@ -47,11 +47,13 @@ class Port:
         return self.custom != "a"
 
     def output_prefix(self, output: str) -> str:
-        """Translation key prefix of one physical port's entities on this device.
+        """Translation key prefix of one physical port's entities: its name.
 
-        USB-A has two physical ports on one device: "a1_", "a2_". USB-C: none.
+        "c1_" ... "c4_"; USB-A has two physical ports on one device: "a1_", "a2_".
+        The port is in the name, as "C1 power", also where only the entity's
+        name shows (its dialog, the cards).
         """
-        return "" if self.is_usb_c else f"a{output[-1]}_"
+        return f"{self.custom}_" if self.is_usb_c else f"a{output[-1]}_"
 
 
 PORTS: Final = (

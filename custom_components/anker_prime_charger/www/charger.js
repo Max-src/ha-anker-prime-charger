@@ -19,7 +19,8 @@ const NO_ENTITIES = {}; // hass.entities before Home Assistant sent it
 /**
  * The charger of `deviceId` (or the first one set up when empty):
  * {device_id, name, model, total_power, ports: [{id, label, usb_c,
- * connected, power, voltage, current}]}. Rejects with the integration's
+ * connected, power, voltage, current, switch, device}]} (`switch`: the
+ * port's on/off switch, the same one for A1 and A2). Rejects with the integration's
  * message (e.g. "Charger not found").
  */
 export function loadCharger(hass, deviceId = "") {
@@ -42,7 +43,7 @@ export function loadCharger(hass, deviceId = "") {
 
 /** The state objects a port shows (for change detection). */
 export function portStates(hass, port) {
-  return [port.connected, port.power, port.voltage, port.current, port.device].map(
+  return [port.connected, port.power, port.voltage, port.current, port.device, port.switch].map(
     (entityId) => (entityId ? hass.states[entityId] : undefined),
   );
 }
@@ -55,7 +56,8 @@ function number(state) {
 /**
  * A port as the cards show it: whether a device is plugged in (connected:
  * true / false, null when unknown), its readings (numbers, null when
- * unknown) and the device's brand as the charger identifies it (USB-C; null
+ * unknown), the device's brand as the charger identifies it (USB-C; null
+ * when unknown) and whether the port is switched on (isOn: true / false, null
  * when unknown). Readings of a port without a device are not shown (null).
  */
 export function readPort(hass, port) {
@@ -64,6 +66,7 @@ export function readPort(hass, port) {
   const reading = (entityId) =>
     connected && entityId ? number(hass.states[entityId]) : null;
   const device = port.device ? hass.states[port.device]?.state : undefined;
+  const switched = port.switch ? hass.states[port.switch]?.state : undefined;
   return {
     ...port,
     isConnected: connected,
@@ -72,6 +75,7 @@ export function readPort(hass, port) {
     amps: reading(port.current),
     deviceName:
       connected && device && !["unknown", "unavailable"].includes(device) ? device : null,
+    isOn: switched === "on" ? true : switched === "off" ? false : null,
   };
 }
 

@@ -21,6 +21,9 @@ window.cardDocs = (() => {
 
   const entityId = (port, reading) => `sensor.docs_charger_${port}_${reading}`;
   const connectedId = (port) => `binary_sensor.docs_charger_${port}_connected`;
+  // A port's on/off switch: A1 and A2 share one, as on the charger
+  const switchId = (port) => `switch.docs_charger_${port.startsWith("a") ? "usba" : port}`;
+  const SWITCHED_OFF = "c4";
   const TOTAL_ID = "sensor.docs_charger_total_output_power";
   const SCREEN = {
     theme: "select.docs_charger_clock_theme",
@@ -56,6 +59,7 @@ window.cardDocs = (() => {
         power: entityId(id, "power"),
         voltage: entityId(id, "voltage"),
         current: entityId(id, "current"),
+        switch: switchId(id),
       })),
       screen: SCREEN,
     };
@@ -73,6 +77,7 @@ window.cardDocs = (() => {
       result[entityId(id, "power")] = state(watts);
       result[entityId(id, "voltage")] = state(volts);
       result[entityId(id, "current")] = state(amps);
+      result[switchId(id)] = state(id === SWITCHED_OFF ? "off" : "on");
     }
     result[TOTAL_ID] = state(total.toFixed(1));
     result[SCREEN.theme] = state(screensaver.kind || "style_2");
@@ -264,5 +269,29 @@ window.cardDocs = (() => {
     if (container.scrollWidth > container.clientWidth) throw Error("Horizontal overflow");
   }
 
-  return { mount };
+  /**
+   * Where to put the mouse over a port (a scenario's `hover`, e.g. "c1"): the
+   * middle of what a tap on it opens (the 3D card's tap area, the outputs
+   * card's port), in page coordinates.
+   */
+  function hoverPoint(port) {
+    const container = document.querySelector("home-assistant").shadowRoot.getElementById("card-docs");
+    const label = `${port.toUpperCase()}: power history`;
+    for (const element of elements(container)) {
+      const isTarget =
+        (element.classList?.contains("hit") && element.getAttribute("data-port") === port) ||
+        (element.classList?.contains("port") && element.getAttribute("aria-label") === label);
+      if (!isTarget) continue;
+      const box = element.getBoundingClientRect();
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    }
+    throw Error(`No tap area for port ${port} (is "Tap a port for its history" on?)`);
+  }
+
+  /** Wait until the card is drawn again (after the mouse moved). */
+  async function settle() {
+    await settled(document.querySelector("home-assistant").shadowRoot.getElementById("card-docs"));
+  }
+
+  return { mount, hoverPoint, settle };
 })();

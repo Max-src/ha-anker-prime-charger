@@ -26,7 +26,8 @@ and fails on missing, duplicate or reversed markers.
 (`3d`, `outputs`), its **variations** (a scenario each) and **editors** (the visual editor). A
 scenario has a `title` (the caption) and may set `ports` (the readings `[W, V, A]` of each port
 with a device; the default is C1, C2 and A2 in use), `offline`, `dark` (Home Assistant's dark
-theme), `width` (the column, default 420 px), `config` (the card's options, e.g. `{"screen": "clock"}`) and, for the 3D card,
+theme), `width` (the column, default 420 px), `config` (the card's options, e.g. `{"screen": "clock"}`), `hover`
+(a port, e.g. `"c1"`: the mouse is put over it before the capture, to show what a tap opens) and, for the 3D card,
 `view` (`{yaw, pitch}`, as if turned by dragging) and `screensaver` (the selected theme: `kind`
 `style_1` to `style_3`, `stock` or `custom`, with our own picture; `time_display`;
 `clock_format` `12h` or `24h`). The clock always shows Wednesday 14 January 2026, 08:40. Add a scenario there: its image and caption

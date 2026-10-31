@@ -56,6 +56,10 @@ async def test_command_gives_the_ports_entities(
     assert a2["connected"] == entity_id(hass, "binary_sensor", "usba_2_status")
     for reading in ("power", "voltage", "current"):
         assert a2[reading] == entity_id(hass, "sensor", f"usba_2_{reading}")
+    # one switch for both USB-A ports (the charger switches them together)
+    usba_switch = entity_id(hass, "switch", "usba_switch")
+    assert [p["switch"] for p in result["ports"][4:]] == [usba_switch, usba_switch]
+    assert result["ports"][0]["switch"] == entity_id(hass, "switch", "usbc_1_switch")
     # the connected device: USB-C only
     assert a2["device"] is None
     assert result["ports"][0]["device"] == entity_id(

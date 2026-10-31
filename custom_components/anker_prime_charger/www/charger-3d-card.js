@@ -26,12 +26,23 @@
  * at once from the second page load on). The first time, the screen stays
  * dark until it is there, as the charger's screen would.
  *
+ * Tapping a port (around it, its power or its cable) opens its power sensor,
+ * its history, as on the outputs card (`port_history`, on by default). A
+ * press that moves more than a few pixels turns the charger instead. Under
+ * the mouse, the port is highlighted (touch screens have no hover).
+ *
+ * With `show_controls`, buttons in its top left corner (empty in the default
+ * view: the charger's top edge is lowest there) zoom out and in and
+ * turn it left and right (held down, they repeat). They work also when it can't be dragged.
+ *
  *   type: custom:anker-prime-charger-3d-card
  *   device: <the charger's device id>   # optional: the first charger
  *   drag_to_rotate: true                # turn it by dragging (default true)
  *   screen: auto                        # auto (default), power, clock or off
  *   show_port_power: true               # each port's power above it (default true)
  *   show_cables: true                   # a cable in each port in use (default true)
+ *   port_history: true                  # tap a port: its power history (default true)
+ *   show_controls: false                # zoom and turn buttons (default false)
  *   view_id: k3x9q2                     # set by the editor
  */
 import { css, html } from "./lib/lit-all.js";
@@ -45,13 +56,18 @@ import { sharedStyles } from "./styles.js";
 
 const DEFAULT_VIEW = { yaw: -35, pitch: 22, zoom: 1 };
 const ZOOM_LIMITS = [0.6, 3];
-const KEY_ZOOM = 1.2; // per + or - press
-const WHEEL_ZOOM = 0.002; // per pixel of wheel
+const KEY_ZOOM = 1.1; // per + or - press (or button)
+// per pixel of wheel: a mouse's notch (100 px) zooms about 10 %
+const WHEEL_ZOOM = 0.001;
+const WHEEL_LINE = 33; // px per line, for wheels that count lines (Firefox)
 const PAGES = ["power", "clock", "off"]; // the charger's screen
 const PITCH_LIMIT = 80;
 const DEGREES_PER_PIXEL = 0.5;
 const KEY_STEP = 10; // degrees per arrow key press
+const BUTTON_TURN = 15; // degrees per press of a turn button
+const REPEAT = { delay: 400, every: 90 }; // ms: a held button repeats
 const SAVE_DELAY = 500; // ms after the last turn
+const TAP_SLOP = 6; // px a tap may move (more: a drag)
 // The user's frontend data (Home Assistant): {view key: {yaw, pitch}}, the key
 // being a card's view_id, or the charger's device id for a card without one
 const VIEWS_KEY = "anker_prime_charger_3d_views";
@@ -102,6 +118,16 @@ function saveView(hass, key, view) {
   return saving;
 }
 
+/** The id of the port ("c1") an event happened on, if any (charger-model.js). */
+function portAt(event) {
+  for (const element of event.composedPath()) {
+    if (element === event.currentTarget) break;
+    const id = element.getAttribute?.("data-port");
+    if (id) return id;
+  }
+  return undefined;
+}
+
 const clamp = (pitch) => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
 const clampZoom = (zoom) => Math.max(ZOOM_LIMITS[0], Math.min(ZOOM_LIMITS[1], zoom));
 const round = (degrees) => Math.round(degrees * 10) / 10;
@@ -116,6 +142,7 @@ class Charger3dCard extends ChargerCard {
     _zoom: { state: true },
     _screensaver: { state: true },
     _now: { state: true },
+    _hover: { state: true },
   };
 
   static editorSchema = [
@@ -138,6 +165,20 @@ class Charger3dCard extends ChargerCard {
       name: "show_port_power",
       label: "Show each port's power",
       helper: "Above each port with a device, whatever the screen shows.",
+      default: true,
+      selector: { boolean: {} },
+    },
+    {
+      name: "show_controls",
+      label: "Show zoom and turn buttons",
+      helper: "Buttons in the corner to zoom out and in and turn it left and right.",
+      default: false,
+      selector: { boolean: {} },
+    },
+    {
+      name: "port_history",
+      label: "Tap a port for its history",
+      helper: "Tapping a port, its power or its cable opens the port's power history, as on the outputs card.",
       default: true,
       selector: { boolean: {} },
     },
@@ -185,6 +226,10 @@ class Charger3dCard extends ChargerCard {
     return this._config?.drag_to_rotate !== false;
   }
 
+  get _tappable() {
+    return this._config?.port_history !== false;
+  }
+
   /** What the screen shows: "auto", "power", "clock" or "off". */
   get _screenMode() {
     const { screen, show_screensaver: clock } = this._config || {};
@@ -217,6 +262,7 @@ class Charger3dCard extends ChargerCard {
     super.disconnectedCallback();
     clearTimeout(this._clock);
     this._clock = undefined;
+    this._stopRepeat();
     this._stopScreensaver?.();
     this._stopScreensaver = this._screensaverKey = undefined;
     // turned just before leaving the page: saved now
@@ -328,6 +374,26 @@ class Charger3dCard extends ChargerCard {
     this._turn(DEFAULT_VIEW.yaw, DEFAULT_VIEW.pitch, DEFAULT_VIEW.zoom);
   }
 
+  /**
+   * The port under the mouse (pen too), highlighted: the one pressed while a
+   * tap is pending, none while dragging. Touch has no hover.
+   */
+  _onHover(event) {
+    if (!this._tappable || event.pointerType === "touch") return;
+    const port = this._tap ? this._tap.port : event.buttons ? undefined : portAt(event);
+    if (port !== this._hover) this._hover = port;
+  }
+
+  _onLeave() {
+    this._hover = undefined;
+  }
+
+  /** A double-click goes back to the default view, unless on a port (opened). */
+  _onDoubleClick(event) {
+    if (this._tappable && portAt(event)) return;
+    this._resetView();
+  }
+
   /** Two touch pointers' distance (a pinch), or undefined. */
   _pinchDistance() {
     if (this._pointers.size !== 2) return undefined;
@@ -346,10 +412,18 @@ class Charger3dCard extends ChargerCard {
       }
     }
     if (this._pointers.size < 2) this._drag = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    // a tap on a port, unless it moves (or a second finger comes)
+    const port = this._tappable && this._pointers.size < 2 ? portAt(event) : undefined;
+    this._tap = port ? { port, x: event.clientX, y: event.clientY, id: event.pointerId } : undefined;
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   _onPointerMove(event) {
+    const tap = this._tap;
+    if (tap?.id === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > TAP_SLOP) {
+      this._tap = undefined;
+    }
+    this._onHover(event);
     if (this._pointers.has(event.pointerId)) {
       this._pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       const distance = this._pinchDistance();
@@ -373,6 +447,12 @@ class Charger3dCard extends ChargerCard {
   }
 
   _onPointerUp(event) {
+    const tap = this._tap;
+    if (tap?.id === event.pointerId) {
+      this._tap = undefined;
+      if (event.type === "pointerup") this._openPort(tap.port);
+    }
+    this._hover = undefined; // the next move finds it again
     this._pointers.delete(event.pointerId);
     if (this._pointers.size < 2) this._pinch = undefined;
     if (this._drag?.id === event.pointerId) this._drag = undefined;
@@ -382,10 +462,91 @@ class Charger3dCard extends ChargerCard {
   _onWheel(event) {
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
-    this._zoomBy(Math.exp(-event.deltaY * WHEEL_ZOOM));
+    const pixels = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * WHEEL_LINE : event.deltaY;
+    this._zoomBy(Math.exp(-pixels * WHEEL_ZOOM));
+  }
+
+  // --- The buttons -----------------------------------------------------------
+
+  /** The buttons' actions, by name. */
+  get _controls() {
+    return [
+      { name: "Zoom out", icon: "mdi:magnify-minus-outline", act: () => this._zoomBy(1 / KEY_ZOOM) },
+      { name: "Zoom in", icon: "mdi:magnify-plus-outline", act: () => this._zoomBy(KEY_ZOOM) },
+      { name: "Turn left", icon: "mdi:rotate-left", act: () => this._turn(this._yaw - BUTTON_TURN, this._pitch) },
+      { name: "Turn right", icon: "mdi:rotate-right", act: () => this._turn(this._yaw + BUTTON_TURN, this._pitch) },
+    ];
+  }
+
+  /** A button pressed: acts at once, then again while held. */
+  _onControlDown(event, control) {
+    if (event.button !== 0) return;
+    event.preventDefault(); // no focus ring, no text selection
+    this._stopRepeat();
+    control.act();
+    this._repeat = setTimeout(() => {
+      this._repeat = setInterval(control.act, REPEAT.every);
+    }, REPEAT.delay);
+  }
+
+  _stopRepeat() {
+    clearTimeout(this._repeat);
+    clearInterval(this._repeat);
+    this._repeat = undefined;
+  }
+
+  /** A click from the keyboard (Enter, space: no pointer, detail 0) acts once;
+   * a pointer's has already acted when pressed. */
+  _onControlClick(event, control) {
+    if (event.detail === 0) control.act();
+  }
+
+  _renderControls() {
+    if (this._config.show_controls !== true) return "";
+    return html`<div class="controls">
+      ${this._controls.map(
+        (control) => html`<button
+          title=${control.name}
+          aria-label=${control.name}
+          @pointerdown=${(event) => this._onControlDown(event, control)}
+          @pointerup=${this._stopRepeat}
+          @pointerleave=${this._stopRepeat}
+          @pointercancel=${this._stopRepeat}
+          @click=${(event) => this._onControlClick(event, control)}
+        >
+          <ha-icon icon=${control.icon}></ha-icon>
+        </button>`,
+      )}
+    </div>`;
+  }
+
+  /** Enter or space on a port's tap area opens it; whether it did. */
+  _onPortKey(event) {
+    if (!this._tappable || (event.key !== "Enter" && event.key !== " ")) return false;
+    const port = portAt(event);
+    if (!port) return false;
+    event.preventDefault();
+    this._openPort(port);
+    return true;
+  }
+
+  /** Not rotatable: a click on a port opens it. */
+  _onClick(event) {
+    const port = this._tappable ? portAt(event) : undefined;
+    if (port) this._openPort(port);
+  }
+
+  /** Open a port's power sensor (its history), as Home Assistant's cards do. */
+  _openPort(id) {
+    const entityId = this._charger?.ports.find((port) => port.id === id)?.power;
+    if (!entityId) return;
+    this.dispatchEvent(
+      new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }),
+    );
   }
 
   _onKeyDown(event) {
+    if (this._onPortKey(event)) return;
     const turns = {
       ArrowLeft: [-KEY_STEP, 0],
       ArrowRight: [KEY_STEP, 0],
@@ -418,10 +579,22 @@ class Charger3dCard extends ChargerCard {
       screen: this._screen(charger, total),
       portPower: this._config.show_port_power === false ? undefined : portPower,
       cables: this._config.show_cables !== false,
+      tappable: this._tappable,
+      hovered: this._hover,
     });
     if (!this._canRotate) {
       return html`<ha-card>
-        <div class=${offline ? "offline" : ""} title=${charger.name}>${model}</div>
+        <div
+          class=${offline ? "offline" : ""}
+          title=${charger.name}
+          @click=${this._onClick}
+          @keydown=${this._onPortKey}
+          @pointermove=${this._onHover}
+          @pointerleave=${this._onLeave}
+        >
+          ${model}
+        </div>
+        ${this._renderControls()}
       </ha-card>`;
     }
     return html`<ha-card>
@@ -434,12 +607,14 @@ class Charger3dCard extends ChargerCard {
         @pointermove=${this._onPointerMove}
         @pointerup=${this._onPointerUp}
         @pointercancel=${this._onPointerUp}
+        @pointerleave=${this._onLeave}
         @wheel=${this._onWheel}
-        @dblclick=${this._resetView}
+        @dblclick=${this._onDoubleClick}
         @keydown=${this._onKeyDown}
       >
         ${model}
       </div>
+      ${this._renderControls()}
     </ha-card>`;
   }
 
@@ -477,7 +652,41 @@ class Charger3dCard extends ChargerCard {
     screensaverStyles,
     css`
       ha-card {
+        position: relative;
         overflow: hidden;
+      }
+      .controls {
+        position: absolute;
+        left: 8px;
+        top: 8px;
+        display: flex;
+        gap: 4px;
+      }
+      .controls button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid var(--divider-color);
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--card-background-color, #fff) 85%, transparent);
+        color: var(--secondary-text-color);
+        cursor: pointer;
+        touch-action: manipulation; /* quick taps: no double-tap zoom */
+        --mdc-icon-size: 18px;
+      }
+      .controls button:hover {
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+      }
+      .controls button:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 1px;
+      }
+      .controls ha-icon {
+        display: flex;
       }
       .rotatable {
         cursor: grab;

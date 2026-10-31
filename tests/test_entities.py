@@ -193,6 +193,17 @@ async def test_port_devices(hass: HomeAssistant, setup_entry: MockConfigEntry) -
         attr(hass, "sensor", "usba_2_power", "friendly_name")
         == "250W Prime Charger USB-A A2 power"
     )
+    # a USB-C port's readings too, as its dialog shows them ("C3 power")
+    for platform, key, name in (
+        ("sensor", "usbc_3_power", "C3 power"),
+        ("sensor", "usbc_3_voltage", "C3 voltage"),
+        ("sensor", "usbc_3_current", "C3 current"),
+        ("sensor", "usbc_3_energy", "C3 energy"),
+        ("binary_sensor", "usbc_3_status", "C3 connected"),
+    ):
+        assert attr(hass, platform, key, "friendly_name") == (
+            f"250W Prime Charger USB-C 3 {name}"
+        )
 
 
 async def test_screen_device(hass: HomeAssistant, setup_entry: MockConfigEntry) -> None:

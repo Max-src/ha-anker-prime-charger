@@ -169,7 +169,8 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Timer, Timer duration, Timer end                      | One-off countdown that turns the port off                                                                                |
 | Schedule start / end, with time, days and days preset | Weekly on and off times                                                                                                  |
 
-On the USB-A device, readings, energy and labels exist for **A1** and **A2** separately.
+Readings, energy, Connected and Label are named after their port (**C1 power**, **C2 energy**, ...).
+On the USB-A device, they exist for **A1** and **A2** separately (**A1 power**, **A2 power**, ...).
 
 </details>
 
@@ -378,7 +379,14 @@ loaded automatically: nothing to install or add under **Resources**.
 
 To add one, edit a dashboard, choose **Add card**, and search for **Anker**. The visual editor
 lets you choose the **Charger** (the first one is preselected), for the outputs card whether to
-**Show voltage and current**, and for the 3D card whether to **Rotate by dragging** (on by
+**Show voltage and current**, whether to **Tap a port for its history** (on by default; the port
+under the mouse is highlighted, as on the 3D card), whether to **Show on/off buttons** (off by default: a small
+button next to each port's label; A1's and A2's turn both USB-A ports on or off, as the charger
+switches them together), and
+for the 3D card whether to **Tap a port for its history** (on by default: tapping a port, its
+power or its cable opens its power history, as on the outputs card; the port under the mouse is
+highlighted), whether to **Show zoom and turn buttons** (off by default: zoom out and in, turn
+left and right; held down, they repeat), whether to **Rotate by dragging** (on by
 default; off, the charger stays as it is shown), whether to **Show plugged-in cables** (on by
 default; off, the ports with a device are only lit), whether to **Show each port's power** (on by
 default: above each USB-C port with a device, as the charger's power page shows it, and on the
@@ -390,8 +398,10 @@ on) or **Off**. The three Standard Styles are drawn in their spirit, not copied.
 
 To turn the 3D card, drag it (on a touch screen, sideways: scrolling up and down still scrolls the
 page), or click it and use the arrow keys. To zoom, use **Ctrl** + the mouse wheel (or pinch on a
-touchpad or touch screen), or **+** and **-**; the mouse wheel alone still scrolls the page.
-Double-click (or **Home**) goes back to the default view. Each card remembers its view (angle and
+touchpad or touch screen), or **+** and **-** (about 10 % a step); the mouse wheel alone still
+scrolls the page. Or turn on **Show zoom and turn buttons**.
+Double-click (or **Home**) goes back to the default view. A press on a port that moves turns the
+charger; one that doesn't opens the port. Each card remembers its view (angle and
 zoom) for your Home Assistant user, so the charger is shown as you
 left it the next time, also on your other devices. (A 3D card from an earlier version gets its own
 view once opened and saved in the editor; until then it shares its charger's.) While the charger
@@ -467,6 +477,8 @@ drag_to_rotate: true # turn it by dragging; its view is remembered (default true
 screen: auto # what its screen shows: auto (default), power, clock or off
 show_port_power: true # each port's power above it (default true)
 show_cables: true # a cable in each port with a device (default true)
+port_history: true # tap a port (or its cable): its power history (default true)
+show_controls: false # zoom and turn buttons in its corner (default false)
 view_id: k3x9q2 # set by the editor: the card's own saved view
 ```
 
@@ -474,6 +486,8 @@ view_id: k3x9q2 # set by the editor: the card's own saved view
 type: custom:anker-prime-charger-outputs-card
 device: 0123456789abcdef0123456789abcdef # optional
 show_details: true # voltage and current under the power (default true)
+show_switches: false # an on/off button next to each port; A1's and A2's switch both (default false)
+port_history: true # tap a port: its power history (default true)
 ```
 
 Without `device`, a card shows the first charger. The device id is in the address of the

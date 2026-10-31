@@ -163,8 +163,9 @@ def ws_charger(
     """The charger's ports and screen, and their entities, for the cards.
 
     The charger of `device_id` (its device), or the first one set up. Each
-    physical port (C1-C4, A1, A2) with the entity ids of its readings (and of
-    the connected device, USB-C), and
+    physical port (C1-C4, A1, A2) with the entity ids of its readings, of its
+    on/off switch (A1 and A2 share one: the charger switches them together)
+    and, USB-C, of the connected device; and
     the screen's: the page it shows (estimated) and the settings the clock
     screensaver depends on; None for one that doesn't exist (disabled).
     """
@@ -193,6 +194,7 @@ def ws_charger(
                     "power": entity("sensor", f"{output}_power"),
                     "voltage": entity("sensor", f"{output}_voltage"),
                     "current": entity("sensor", f"{output}_current"),
+                    "switch": entity("switch", f"{port.key}_switch"),
                     "device": entity("sensor", f"{port.key}_connected_device")
                     if port.is_usb_c
                     else None,

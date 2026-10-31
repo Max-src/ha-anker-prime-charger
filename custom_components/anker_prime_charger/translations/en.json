@@ -61,8 +61,17 @@
   },
   "entity": {
     "binary_sensor": {
-      "connected": {
-        "name": "Connected"
+      "c1_connected": {
+        "name": "C1 connected"
+      },
+      "c2_connected": {
+        "name": "C2 connected"
+      },
+      "c3_connected": {
+        "name": "C3 connected"
+      },
+      "c4_connected": {
+        "name": "C4 connected"
       },
       "a1_connected": {
         "name": "A1 connected"
@@ -218,8 +227,17 @@
       "firmware_update_progress": {
         "name": "Firmware update progress"
       },
-      "energy": {
-        "name": "Energy"
+      "c1_energy": {
+        "name": "C1 energy"
+      },
+      "c2_energy": {
+        "name": "C2 energy"
+      },
+      "c3_energy": {
+        "name": "C3 energy"
+      },
+      "c4_energy": {
+        "name": "C4 energy"
       },
       "a1_energy": {
         "name": "A1 energy"
@@ -227,14 +245,17 @@
       "a2_energy": {
         "name": "A2 energy"
       },
-      "power": {
-        "name": "Power"
+      "c1_power": {
+        "name": "C1 power"
       },
-      "voltage": {
-        "name": "Voltage"
+      "c2_power": {
+        "name": "C2 power"
       },
-      "current": {
-        "name": "Current"
+      "c3_power": {
+        "name": "C3 power"
+      },
+      "c4_power": {
+        "name": "C4 power"
       },
       "a1_power": {
         "name": "A1 power"
@@ -242,11 +263,35 @@
       "a2_power": {
         "name": "A2 power"
       },
+      "c1_voltage": {
+        "name": "C1 voltage"
+      },
+      "c2_voltage": {
+        "name": "C2 voltage"
+      },
+      "c3_voltage": {
+        "name": "C3 voltage"
+      },
+      "c4_voltage": {
+        "name": "C4 voltage"
+      },
       "a1_voltage": {
         "name": "A1 voltage"
       },
       "a2_voltage": {
         "name": "A2 voltage"
+      },
+      "c1_current": {
+        "name": "C1 current"
+      },
+      "c2_current": {
+        "name": "C2 current"
+      },
+      "c3_current": {
+        "name": "C3 current"
+      },
+      "c4_current": {
+        "name": "C4 current"
       },
       "a1_current": {
         "name": "A1 current"
@@ -325,8 +370,17 @@
       "clock_display_days": {
         "name": "Clock screensaver days"
       },
-      "label": {
-        "name": "Label"
+      "c1_label": {
+        "name": "C1 label"
+      },
+      "c2_label": {
+        "name": "C2 label"
+      },
+      "c3_label": {
+        "name": "C3 label"
+      },
+      "c4_label": {
+        "name": "C4 label"
       },
       "a1_label": {
         "name": "A1 label"

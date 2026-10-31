@@ -14,7 +14,15 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
     or always the power page (the total output), the charger's clock screensaver (the selected
     theme, with the time) or nothing. Each port's power can be written above it, whatever the
     screen shows, and the cables can be hidden.
+    Tapping a port (around it, its power or its cable) opens its power history, as on the
+    outputs card (**Tap a port for its history**, on by default; the port under the mouse is
+    highlighted); a drag still turns it. **Show zoom and turn buttons** (off by default) adds
+    buttons in its corner to zoom and turn it. Zooming with the wheel
+    or + and - goes in smaller steps (about 10 %).
   - **Anker Prime Charger outputs**: each port's power, voltage and current, as in the Anker app.
+    Tapping a port opens its power history (**Tap a port for its history**, on by default; the
+    port under the mouse is highlighted, as on the 3D card). **Show on/off buttons** (off by default) adds a small button next to each port's label; A1's
+    and A2's both turn the two USB-A ports on or off, as the charger switches them together.
 - Clock image actions: **Add clock image** (from *My media* or a file, cropped to the screen,
   optionally with the app's dark edges), **Rename clock image**, **Delete clock image** and
   **List clock images**.
@@ -47,6 +55,9 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 
 ### Changed
 
+- A USB-C port's readings are named after the port, as the USB-A ones already were: **C1 power**,
+  **C1 voltage**, **C1 current**, **C1 energy**, **C1 connected** and **C1 label** (they were
+  **Power**, **Voltage**, ...), so the port shows in their dialogs too. Entity ids don't change.
 - Choosing the charging mode that is already active no longer sends it again (every mode change
   restarts the ports for a few seconds).
 - An unnamed custom image shows as `Custom <number>`, as in the Anker app.

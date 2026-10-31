@@ -131,6 +131,12 @@ async function capture(browser, state, image) {
     await page.waitForFunction((element) => !!customElements.get(element), image.element);
     await page.addScriptTag({ path: path.join(__dirname, "card-docs-browser.js") });
     await page.evaluate((image) => window.cardDocs.mount(image), image);
+    if (image.scenario.hover) {
+      // the mouse over a port: its highlight (what a tap opens)
+      const point = await page.evaluate((port) => window.cardDocs.hoverPoint(port), image.scenario.hover);
+      await page.mouse.move(point.x, point.y);
+      await page.evaluate(() => window.cardDocs.settle());
+    }
     return await page.locator("#card-docs").screenshot({ type: "png" });
   } finally {
     await context.close();

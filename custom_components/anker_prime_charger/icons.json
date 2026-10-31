@@ -163,7 +163,16 @@
       "schedule_end_days": {
         "default": "mdi:calendar-week"
       },
-      "label": {
+      "c1_label": {
+        "default": "mdi:label-outline"
+      },
+      "c2_label": {
+        "default": "mdi:label-outline"
+      },
+      "c3_label": {
+        "default": "mdi:label-outline"
+      },
+      "c4_label": {
         "default": "mdi:label-outline"
       },
       "a1_label": {
