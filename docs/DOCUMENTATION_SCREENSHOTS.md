@@ -89,7 +89,8 @@ form elements) from CI's: CI's are the ones committed.
 [Documentation Screenshots](../.github/workflows/documentation-screenshots.yaml) runs on pull
 requests and pushes to main that touch the cards, their tooling or the README, monthly, and on
 request. It boots a pinned Home Assistant container (the "stable" version of the tests), onboards
-it, captures, and checks the galleries. Pull requests only get the images as artifacts. On main,
+it, checks the galleries against the committed images (a new scenario's image is pending), and
+captures. Pull requests only get the images as artifacts. On main,
 a second job commits the changed images and galleries (`[docs-generated]` in the message, which
 keeps it from running again on its own commit), unless main moved on meanwhile. It never changes
 anything else. Branch protection must allow that push, or the job fails visibly and the images
