@@ -5,6 +5,8 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-31
+
 ### Added
 
 - Dashboard cards, loaded automatically and set up with the visual editor:
@@ -72,6 +74,8 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 - The screenshots of Home Assistant's pages (the integration, the charger, a port, the Screen,
   the lists and the Set custom settings action) are generated too, from a real charger with its
   serial number and addresses replaced, and show the current entities.
+- The README describes manual installation only, from `anker_prime_charger.zip` or the
+  repository; the HACS installation, update and removal steps were removed.
 
 ## [0.17.0] - 2026-10-15
 
