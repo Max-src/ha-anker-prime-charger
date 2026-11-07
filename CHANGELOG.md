@@ -5,6 +5,8 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-07
+
 ### Added
 
 - **Firmware** update entity on the charger: the installed firmware (as the charger reports
@@ -43,6 +45,13 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
   port), a saved front view (0°) is restored as such, and the clock picture is fetched only when
   needed.
 - Lit 3 for the cards.
+- The outputs card is greyed out while the charger is offline, as the 3D card is.
+- Cards: screen readers get labels for the tap areas and buttons, and an on/off button whose
+  state is unknown says so (mixed) instead of off.
+- The clock image list loads the images' previews at the same time instead of one by one.
+- Documentation: PROTOCOL.md describes the 5-minute real-time trigger (`0057`) and the firmware
+  versions request (`0030` → `0830`), and why there is no Matter, HomeKit or local network
+  access; the README's Known limitations say so too.
 
 ### Fixed
 
@@ -56,6 +65,13 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
   the plain clock.
 - The picture download of the cards is limited in size, and not repeated when two cards ask at
   once.
+- Reloading or removing the integration left the MQTT client's network thread running, and
+  cleared the charger's last values.
+- A command from Home Assistant that changed no value (the same brightness, say) didn't show as
+  a screen wake on **Page**.
+- Removing the integration now also removes the cards' module when dashboards are in YAML mode.
+- 3D card: a touch interrupted (by a notification, say) could make the next touch count as a
+  pinch.
 
 ## [0.18.0] - 2026-10-31
 
