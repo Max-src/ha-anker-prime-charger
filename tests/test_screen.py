@@ -136,3 +136,29 @@ async def test_sensor_follows_the_clock_hours(
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert state(hass, "sensor", "screen_page") == "off"
+
+
+async def test_wake_screen_button(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    cloud: FakeCloud,
+    setup_entry: MockConfigEntry,
+    commands: list,
+) -> None:
+    """It resends the Timeout as reported (30 s): the power page shows for it."""
+    freezer.move_to(local(MONDAY, 23))
+    cloud.mqtt.deliver({"usbc_1_power": 1.6})
+    await hass.async_block_till_done()
+    assert state(hass, "sensor", "screen_page") == "off"
+    button = entity_id(hass, "button", "wake_screen")
+    assert (
+        attr(hass, "button", "wake_screen", "friendly_name")
+        == "250W Prime Charger Screen Wake screen"
+    )
+
+    await call(hass, "button", "press", button)
+    assert commands == [
+        ("display_timeout_mode_select", "30", "set_display_timeout_mode")
+    ]
+    assert state(hass, "sensor", "screen_page") == "power"
+    assert state(hass, "select", "display_timeout_mode") == "30s"

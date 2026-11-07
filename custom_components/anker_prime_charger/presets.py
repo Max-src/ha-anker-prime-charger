@@ -154,6 +154,7 @@ class ProtocolsPresetSelect(PresetSelect):
 
     _attr_translation_key = "custom_protocols_preset"
     _attr_options = ["all", "none", CUSTOM]
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
         """Initialize."""

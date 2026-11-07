@@ -12,12 +12,16 @@
 - Serves the clock screensaver's picture (login needed), kept in memory per
   charger: Anker's links to it change every time, so the browser could never
   keep it; the card keeps it by its key (theme and file), which doesn't.
+  Downloaded once at a time per charger (two cards asking at once: one
+  download), and never more than MAX_IMAGE_SIZE.
 """
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any, Final
+from weakref import WeakKeyDictionary
 
 from aiohttp import ClientError, ClientTimeout, web
 import voluptuous as vol
@@ -48,6 +52,14 @@ WS_CHARGER: Final = f"{DOMAIN}/charger"
 WS_SCREENSAVER: Final = f"{DOMAIN}/screensaver"
 SCREENSAVER_IMAGE_URL: Final = f"/api/{DOMAIN}/screensaver_image"
 IMAGE_TIMEOUT: Final = 30  # seconds to download a picture from Anker
+# A clock picture is 480 x 200 (a few dozen kB); anything much larger is not one
+MAX_IMAGE_SIZE: Final = 5 * 1024 * 1024
+IMAGE_CHUNK: Final = 64 * 1024
+
+# One picture download at a time per charger
+_image_locks: WeakKeyDictionary[PrimeChargerCoordinator, asyncio.Lock] = (
+    WeakKeyDictionary()
+)
 
 
 async def async_setup_frontend(hass: HomeAssistant) -> None:
@@ -71,6 +83,16 @@ async def async_setup_frontend(hass: HomeAssistant) -> None:
 async def async_remove_frontend(hass: HomeAssistant) -> None:
     """Stop loading the cards (the last charger was removed)."""
     if (resources := await _async_resources(hass)) is None:
+        # resources in YAML: injected in the page instead (async_setup_frontend)
+        if "frontend" in hass.config.components:
+            from homeassistant.components.frontend import (
+                DATA_EXTRA_MODULE_URL,
+                remove_extra_js_url,
+            )
+
+            urls = hass.data.get(DATA_EXTRA_MODULE_URL)
+            if urls is not None and CARDS_MODULE in urls.urls:
+                remove_extra_js_url(hass, CARDS_MODULE)
         return
     for item in resources.async_items():
         if item["url"] == CARDS_MODULE:
@@ -166,8 +188,9 @@ def ws_charger(
     physical port (C1-C4, A1, A2) with the entity ids of its readings, of its
     on/off switch (A1 and A2 share one: the charger switches them together)
     and, USB-C, of the connected device; and
-    the screen's: the page it shows (estimated) and the settings the clock
-    screensaver depends on; None for one that doesn't exist (disabled).
+    the screen's: the page it shows (estimated), the settings the clock
+    screensaver depends on, its brightness and its Wake screen button (the
+    3D card's knob); None for one that doesn't exist (disabled).
     """
     if (coordinator := _coordinator(hass, connection, msg)) is None:
         return
@@ -207,6 +230,8 @@ def ws_charger(
                 "theme": entity("select", "theme_id"),
                 "time_display": entity("switch", "time_display"),
                 "clock_format": entity("select", "clock_mode"),
+                "brightness": entity("number", "display_brightness"),
+                "wake": entity("button", "wake_screen"),
             },
         },
     )
@@ -295,23 +320,46 @@ class ScreensaverImageView(HomeAssistantView):
         theme = themes.current_theme(coordinator)
         if (key := _image_key(coordinator, theme)) is None:
             raise web.HTTPNotFound
-        cached = coordinator.screensaver_image
-        if cached is None or cached[0] != key:
-            if (url := await _async_image_url(coordinator, theme)) is None:
-                raise web.HTTPNotFound
-            try:
-                async with async_get_clientsession(hass).get(
-                    url, timeout=ClientTimeout(total=IMAGE_TIMEOUT)
-                ) as resp:
-                    if resp.status != 200:
-                        raise web.HTTPBadGateway
-                    body = await resp.read()
-                    content_type = resp.content_type or "image/jpeg"
-            except (ClientError, TimeoutError) as err:
-                raise web.HTTPBadGateway from err
-            cached = coordinator.screensaver_image = (key, body, content_type)
+        lock = _image_locks.setdefault(coordinator, asyncio.Lock())
+        async with lock:
+            # another request may have downloaded it meanwhile
+            cached = coordinator.screensaver_image
+            if cached is None or cached[0] != key:
+                if (url := await _async_image_url(coordinator, theme)) is None:
+                    raise web.HTTPNotFound
+                body, content_type = await _async_download(hass, url)
+                cached = coordinator.screensaver_image = (key, body, content_type)
         return web.Response(
             body=cached[1],
             content_type=cached[2],
             headers={"X-Image-Key": cached[0], "Cache-Control": "no-store"},
         )
+
+
+async def _async_download(hass: HomeAssistant, url: str) -> tuple[bytes, str]:
+    """A picture from Anker's storage: (its bytes, its type).
+
+    Raises a bad gateway when it can't be had, or is larger than a picture.
+    """
+    try:
+        async with async_get_clientsession(hass).get(
+            url, timeout=ClientTimeout(total=IMAGE_TIMEOUT)
+        ) as resp:
+            if resp.status != 200:
+                raise web.HTTPBadGateway
+            body = bytearray()
+            async for chunk in resp.content.iter_chunked(IMAGE_CHUNK):
+                body += chunk
+                if len(body) > MAX_IMAGE_SIZE:
+                    LOGGER.warning(
+                        "Clock picture larger than %s bytes, not shown", MAX_IMAGE_SIZE
+                    )
+                    raise web.HTTPBadGateway
+            return bytes(body), resp.content_type or "image/jpeg"
+    except web.HTTPException:
+        raise
+    except (ClientError, TimeoutError) as err:
+        raise web.HTTPBadGateway from err
+    except Exception as err:  # anything else: a bad gateway, not a 500
+        LOGGER.warning("Clock picture download failed: %r", err)
+        raise web.HTTPBadGateway from err

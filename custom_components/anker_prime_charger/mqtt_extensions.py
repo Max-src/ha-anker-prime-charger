@@ -20,6 +20,16 @@ to the library's model map at runtime, so the vendored files stay unchanged.
 - Custom charging mode (one of the app's test features, captured 2026-10-22,
   docs/PROTOCOL.md) is turned on in the cloud only; turning it off also sends
   0211, a2 0.
+- Real-time trigger with a duration (command 0057, a2 1 on / 0 off, a3 the
+  seconds as 2 bytes): the app sends it with 300 s each time it opens the
+  charger. The library only knows the 10 s trigger (020b) for this charger.
+  Whether the charger keeps its live values coming for the whole 300 s is
+  checked at run time (fast_updates.py).
+- Firmware versions (command 0030, a2 the account's user id, as the app
+  sends it): the charger answers with message 0830, a1 "v0.2.9.7" and a2
+  "v2.1.1.6" (the firmware the cloud lists), a3-a5 the names of its parts
+  ("A2345", "A2345_mcu", "A2345_esp32"). Which part a1 is the version of is
+  not known; the library calls a1 hw_version on other models.
 
 The library knows the rest the integration uses for the A2345, since its
 late October 2026 update: the time display (command 0222, reported in 0a02
@@ -34,7 +44,7 @@ accepts the command but the screen doesn't get darker).
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final, cast
 
 from .const import MODEL
 from .ports import USB_C_PORTS
@@ -43,11 +53,14 @@ from .solixapi.mqtt_charger import FEATURES, MODELS
 from .solixapi.mqttcmdmap import (
     BYTES,
     CMD_COMMON,
+    CMD_REALTIME_TRIGGER,
     COMMAND_NAME,
     LENGTH,
     NAME,
     TYPE,
+    VALUE_MAX,
     VALUE_OPTIONS,
+    VALUE_STATE,
     VALUE_STEP,
     SolixMqttCommands,
 )
@@ -83,6 +96,19 @@ TEST_FEATURE_COMMANDS: Final = {
 
 EASTER_EGG_STATE: Final = "easter_egg_type"
 
+# Real-time trigger with a duration (0057) and its parameters (library names)
+TIMED_TRIGGER_COMMAND: Final = "realtime_trigger_timed"
+TIMED_TRIGGER_SWITCH: Final = "set_realtime_trigger"
+TIMED_TRIGGER_SECONDS: Final = "trigger_timeout_sec"
+# Message with the live port values the real-time triggers turn on
+LIVE_VALUES_MESSAGE: Final = "0303"
+
+# Firmware versions: the request (0030), its parameter, and the reported values
+VERSION_REQUEST_COMMAND: Final = "version_request"
+VERSION_REQUEST_PARAMETER: Final = "set_account_id"
+SW_VERSION_STATE: Final = "sw_version"
+HW_VERSION_STATE: Final = "hw_version"
+
 # Decoded values the library's cache update drops (its key filter doesn't
 # know them); the coordinator stores these itself (see _async_mqtt_message):
 # the device on each USB-C port (USB-PD vendor and product id, brand and
@@ -117,6 +143,42 @@ def _extend_model_map() -> None:
     # Commands must also be listed as a charger feature to be accepted
     FEATURES.setdefault(CUSTOM_MODE_COMMAND, MODELS)
     model_map.setdefault("0305", {"a2": {NAME: EASTER_EGG_STATE}})
+
+    # Real-time trigger with a duration; the seconds as 2 bytes, as the app sends
+    seconds = cast(dict[str, Any], CMD_REALTIME_TRIGGER["a3"])
+    model_map.setdefault(
+        "0057",
+        CMD_REALTIME_TRIGGER
+        | {
+            COMMAND_NAME: TIMED_TRIGGER_COMMAND,
+            "a3": seconds | {TYPE: DeviceHexDataTypes.sile.value, VALUE_MAX: 600},
+        },
+    )
+    FEATURES.setdefault(TIMED_TRIGGER_COMMAND, MODELS)
+
+    # Firmware versions: the request (the user id without a length byte; a
+    # state name lets the library accept any text) and the answer
+    model_map.setdefault(
+        "0030",
+        CMD_COMMON
+        | {
+            COMMAND_NAME: VERSION_REQUEST_COMMAND,
+            "a2": {
+                NAME: VERSION_REQUEST_PARAMETER,
+                TYPE: DeviceHexDataTypes.str.value,
+                LENGTH: 0,
+                VALUE_STATE: "account_id",
+            },
+        },
+    )
+    FEATURES.setdefault(VERSION_REQUEST_COMMAND, MODELS)
+    model_map.setdefault(
+        "0830",
+        {
+            "a1": {NAME: HW_VERSION_STATE, TYPE: DeviceHexDataTypes.str.value},
+            "a2": {NAME: SW_VERSION_STATE, TYPE: DeviceHexDataTypes.str.value},
+        },
+    )
 
     # The custom image's link: no length byte (LENGTH 0, like the stock link)
     theme_cmds = model_map["0205"]

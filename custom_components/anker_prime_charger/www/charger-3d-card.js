@@ -31,6 +31,12 @@
  * press that moves more than a few pixels turns the charger instead. Under
  * the mouse, the port is highlighted (touch screens have no hover).
  *
+ * Tapping the knob wakes the charger's screen (`knob: wake`, the default: its
+ * Wake screen button). With `arrows: brightness`, two arrows on the glass
+ * beside the display dim and brighten the charger's screen, 5 % a tap; taps
+ * in a row are sent as one command once they stop, and the screen shows the
+ * brightness meanwhile. A control pulses while its command is on its way.
+ *
  * With `show_controls`, buttons in its top left corner (empty in the default
  * view: the charger's top edge is lowest there) zoom out and in and
  * turn it left and right (held down, they repeat). They work also when it can't be dragged.
@@ -43,6 +49,8 @@
  *   show_cables: true                   # a cable in each port in use (default true)
  *   port_history: true                  # tap a port: its power history (default true)
  *   show_controls: false                # zoom and turn buttons (default false)
+ *   knob: wake                          # tap the knob: wake (default) or none
+ *   arrows: none                        # none (default) or brightness
  *   view_id: k3x9q2                     # set by the editor
  */
 import { css, html } from "./lib/lit-all.js";
@@ -52,6 +60,7 @@ import { chargerModel, modelStyles } from "./charger-model.js";
 import { screensaverDrawing, screensaverStyles } from "./charger-screensaver.js";
 import { watchScreensaver } from "./screensaver-store.js";
 import { defineOnce, registerCustomCard } from "./registration.js";
+import { t } from "./strings.js";
 import { sharedStyles } from "./styles.js";
 
 const DEFAULT_VIEW = { yaw: -35, pitch: 22, zoom: 1 };
@@ -68,6 +77,10 @@ const BUTTON_TURN = 15; // degrees per press of a turn button
 const REPEAT = { delay: 400, every: 90 }; // ms: a held button repeats
 const SAVE_DELAY = 500; // ms after the last turn
 const TAP_SLOP = 6; // px a tap may move (more: a drag)
+// The screen's brightness (the integration's Brightness: 20-100 %, 5 % steps)
+const BRIGHTNESS = { min: 20, max: 100, step: 5 };
+const BRIGHTNESS_SEND_DELAY = 700; // ms after the last arrow tap
+const NOTE_TIME = 2000; // ms the brightness shows on the screen
 // The user's frontend data (Home Assistant): {view key: {yaw, pitch}}, the key
 // being a card's view_id, or the charger's device id for a card without one
 const VIEWS_KEY = "anker_prime_charger_3d_views";
@@ -118,19 +131,29 @@ function saveView(hass, key, view) {
   return saving;
 }
 
-/** The id of the port ("c1") an event happened on, if any (charger-model.js). */
-function portAt(event) {
+/**
+ * What an event happened on (charger-model.js), if anything: a port's id
+ * ("c1") or a control's ("knob", "dimmer", "brighter").
+ */
+function targetAt(event) {
   for (const element of event.composedPath()) {
     if (element === event.currentTarget) break;
-    const id = element.getAttribute?.("data-port");
+    const id = element.getAttribute?.("data-port") || element.getAttribute?.("data-control");
     if (id) return id;
   }
   return undefined;
 }
 
+const CONTROLS = ["knob", "dimmer", "brighter"];
+
 const clamp = (pitch) => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
 const clampZoom = (zoom) => Math.max(ZOOM_LIMITS[0], Math.min(ZOOM_LIMITS[1], zoom));
 const round = (degrees) => Math.round(degrees * 10) / 10;
+/** A saved number, or `fallback` when it isn't one (0 is one). */
+const finite = (value, fallback) => {
+  const number = Number(value);
+  return value !== null && value !== "" && Number.isFinite(number) ? number : fallback;
+};
 
 class Charger3dCard extends ChargerCard {
   static cardSize = 4;
@@ -143,58 +166,87 @@ class Charger3dCard extends ChargerCard {
     _screensaver: { state: true },
     _now: { state: true },
     _hover: { state: true },
+    _busy: { state: true },
+    _note: { state: true },
+    _brightnessTarget: { state: true },
   };
 
   static editorSchema = [
     {
       name: "drag_to_rotate",
-      label: "Rotate by dragging",
-      helper:
-        "Turn the charger by dragging it (or with the arrow keys), zoom with Ctrl + the mouse wheel, a pinch, or + and -; its view is remembered.",
+      label: "3d.drag_to_rotate",
+      helper: "3d.drag_to_rotate.helper",
       default: true,
       selector: { boolean: {} },
     },
     {
       name: "show_cables",
-      label: "Show plugged-in cables",
-      helper: "A cable in each port with a device; off, those ports are only lit.",
+      label: "3d.show_cables",
+      helper: "3d.show_cables.helper",
       default: true,
       selector: { boolean: {} },
     },
     {
       name: "show_port_power",
-      label: "Show each port's power",
-      helper: "Above each port with a device, whatever the screen shows.",
+      label: "3d.show_port_power",
+      helper: "3d.show_port_power.helper",
       default: true,
       selector: { boolean: {} },
     },
     {
       name: "show_controls",
-      label: "Show zoom and turn buttons",
-      helper: "Buttons in the corner to zoom out and in and turn it left and right.",
+      label: "3d.show_controls",
+      helper: "3d.show_controls.helper",
       default: false,
       selector: { boolean: {} },
     },
     {
       name: "port_history",
-      label: "Tap a port for its history",
-      helper: "Tapping a port, its power or its cable opens the port's power history, as on the outputs card.",
+      label: "3d.port_history",
+      helper: "3d.port_history.helper",
       default: true,
       selector: { boolean: {} },
     },
     {
+      name: "knob",
+      label: "3d.knob",
+      helper: "3d.knob.helper",
+      default: "wake",
+      selector: {
+        button_toggle: {
+          options: [
+            { value: "wake", label: "3d.knob.wake" },
+            { value: "none", label: "3d.knob.none" },
+          ],
+        },
+      },
+    },
+    {
+      name: "arrows",
+      label: "3d.arrows",
+      helper: "3d.arrows.helper",
+      default: "none",
+      selector: {
+        button_toggle: {
+          options: [
+            { value: "none", label: "3d.arrows.none" },
+            { value: "brightness", label: "3d.arrows.brightness" },
+          ],
+        },
+      },
+    },
+    {
       name: "screen",
-      label: "The screen shows",
-      helper:
-        "Auto: what the charger shows (estimated). Power: the total output. Clock: the selected clock theme, with the time.",
+      label: "3d.screen",
+      helper: "3d.screen.helper",
       default: "auto",
       selector: {
         button_toggle: {
           options: [
-            { value: "auto", label: "Auto" },
-            { value: "power", label: "Power" },
-            { value: "clock", label: "Clock" },
-            { value: "off", label: "Off" },
+            { value: "auto", label: "3d.screen.auto" },
+            { value: "power", label: "3d.screen.power" },
+            { value: "clock", label: "3d.screen.clock" },
+            { value: "off", label: "3d.screen.off" },
           ],
         },
       },
@@ -207,6 +259,7 @@ class Charger3dCard extends ChargerCard {
     this._pitch = DEFAULT_VIEW.pitch;
     this._zoom = DEFAULT_VIEW.zoom;
     this._pointers = new Map(); // touch pointers down: id -> {x, y}
+    this._busy = new Set(); // controls whose command is on its way
   }
 
   /**
@@ -228,6 +281,19 @@ class Charger3dCard extends ChargerCard {
 
   get _tappable() {
     return this._config?.port_history !== false;
+  }
+
+  /** Whether a tap on `id` (a port or a control) does something. */
+  _taps(id) {
+    if (!id) return false;
+    if (CONTROLS.includes(id)) return this._screenControls().some((control) => control.id === id);
+    return this._tappable;
+  }
+
+  /** The tap target an event happened on, if a tap there does something. */
+  _targetAt(event) {
+    const id = targetAt(event);
+    return this._taps(id) ? id : undefined;
   }
 
   /** What the screen shows: "auto", "power", "clock" or "off". */
@@ -254,34 +320,44 @@ class Charger3dCard extends ChargerCard {
 
   connectedCallback() {
     super.connectedCallback();
-    this._tick();
-    this.requestUpdate(); // back on the page: follows its screensaver again
+    this.requestUpdate(); // back on the page: follows its screensaver and clock again
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    clearTimeout(this._clock);
-    this._clock = undefined;
+    this._stopClock();
     this._stopRepeat();
+    this._resetPointers();
     this._stopScreensaver?.();
     this._stopScreensaver = this._screensaverKey = undefined;
     // turned just before leaving the page: saved now
     if (this._saveTimer) this._saveView();
+    // a brightness not sent yet: sent now
+    if (this._brightnessTimer) this._sendBrightness();
+    clearTimeout(this._noteTimer);
+    this._note = this._noteTimer = undefined;
   }
 
-  setConfig(config) {
-    super.setConfig(config);
-    if (this.isConnected) this._tick();
-  }
-
-  /** The clock: the time now, and again at the next minute (while shown). */
+  /** The clock: the time now, and again at the next minute (while it shows). */
   _tick() {
-    clearTimeout(this._clock);
-    this._clock = undefined;
-    if (!this._showsScreensaver || !this.isConnected) return;
     this._now = new Date();
     const next = 60000 - (Date.now() % 60000) + 50;
-    this._clock = setTimeout(() => this._tick(), next);
+    this._clock = setTimeout(() => {
+      this._clock = undefined;
+      if (this.isConnected) this._tick();
+    }, next);
+  }
+
+  _stopClock() {
+    clearTimeout(this._clock);
+    this._clock = undefined;
+  }
+
+  /** The minute timer runs only while the screen shows the clock. */
+  _followClock() {
+    const shown = this.isConnected && this._charger && this._page(this._charger) === "clock";
+    if (shown && !this._clock) this._tick();
+    else if (!shown) this._stopClock();
   }
 
   /** Where the card's view is saved: its view_id, else its charger. */
@@ -290,9 +366,9 @@ class Charger3dCard extends ChargerCard {
   }
 
   _watched(hass) {
-    const states = summaryStates(hass, this._charger);
-    if (!this._showsScreensaver) return states;
     const screen = this._charger.screen || {};
+    const states = [...summaryStates(hass, this._charger), hass.states[screen.brightness], hass.states[screen.wake]];
+    if (!this._showsScreensaver) return states;
     const ids = [screen.page, screen.theme, screen.time_display, screen.clock_format];
     return [...states, ...ids.map((id) => hass.states[id])];
   }
@@ -321,9 +397,10 @@ class Charger3dCard extends ChargerCard {
     const show = (view) => {
       // not if the user is already turning it, or the card changed meanwhile
       if (!view || this._turned || this._viewKey !== key) return;
-      this._yaw = Number(view.yaw) || DEFAULT_VIEW.yaw;
-      this._pitch = clamp(Number(view.pitch) || 0);
-      this._zoom = clampZoom(Number(view.zoom) || DEFAULT_VIEW.zoom);
+      this._yaw = finite(view.yaw, DEFAULT_VIEW.yaw);
+      this._pitch = clamp(finite(view.pitch, DEFAULT_VIEW.pitch));
+      // a zoom of 0 isn't one: the default
+      this._zoom = clampZoom(finite(view.zoom, DEFAULT_VIEW.zoom) || DEFAULT_VIEW.zoom);
     };
     show(keptViews()[key]);
     savedViews(this.hass).then((views) => {
@@ -337,6 +414,7 @@ class Charger3dCard extends ChargerCard {
     super.willUpdate(changed);
     this._loadView();
     this._loadScreensaver();
+    this._followClock();
   }
 
   /** Whether the clock should show and isn't there yet (the first time). */
@@ -379,19 +457,26 @@ class Charger3dCard extends ChargerCard {
    * tap is pending, none while dragging. Touch has no hover.
    */
   _onHover(event) {
-    if (!this._tappable || event.pointerType === "touch") return;
-    const port = this._tap ? this._tap.port : event.buttons ? undefined : portAt(event);
-    if (port !== this._hover) this._hover = port;
+    if (event.pointerType === "touch") return;
+    const id = this._tap ? this._tap.id : event.buttons ? undefined : this._targetAt(event);
+    if (id !== this._hover) this._hover = id;
   }
 
   _onLeave() {
     this._hover = undefined;
   }
 
-  /** A double-click goes back to the default view, unless on a port (opened). */
+  /** A double-click goes back to the default view, unless on a port or a control (tapped). */
   _onDoubleClick(event) {
-    if (this._tappable && portAt(event)) return;
+    if (this._targetAt(event)) return;
     this._resetView();
+  }
+
+  /** Forget the pointers down (the card left, or a pointer was lost), so the
+   * next touch isn't taken for the second finger of a pinch. */
+  _resetPointers() {
+    this._pointers.clear();
+    this._drag = this._pinch = this._tap = undefined;
   }
 
   /** Two touch pointers' distance (a pinch), or undefined. */
@@ -412,15 +497,15 @@ class Charger3dCard extends ChargerCard {
       }
     }
     if (this._pointers.size < 2) this._drag = { x: event.clientX, y: event.clientY, id: event.pointerId };
-    // a tap on a port, unless it moves (or a second finger comes)
-    const port = this._tappable && this._pointers.size < 2 ? portAt(event) : undefined;
-    this._tap = port ? { port, x: event.clientX, y: event.clientY, id: event.pointerId } : undefined;
+    // a tap on a port or a control, unless it moves (or a second finger comes)
+    const id = this._pointers.size < 2 ? this._targetAt(event) : undefined;
+    this._tap = id ? { id, x: event.clientX, y: event.clientY, pointer: event.pointerId } : undefined;
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   _onPointerMove(event) {
     const tap = this._tap;
-    if (tap?.id === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > TAP_SLOP) {
+    if (tap?.pointer === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > TAP_SLOP) {
       this._tap = undefined;
     }
     this._onHover(event);
@@ -448,9 +533,9 @@ class Charger3dCard extends ChargerCard {
 
   _onPointerUp(event) {
     const tap = this._tap;
-    if (tap?.id === event.pointerId) {
+    if (tap?.pointer === event.pointerId) {
       this._tap = undefined;
-      if (event.type === "pointerup") this._openPort(tap.port);
+      if (event.type === "pointerup") this._activate(tap.id);
     }
     this._hover = undefined; // the next move finds it again
     this._pointers.delete(event.pointerId);
@@ -470,11 +555,12 @@ class Charger3dCard extends ChargerCard {
 
   /** The buttons' actions, by name. */
   get _controls() {
+    const name = (key) => t(this.hass, key);
     return [
-      { name: "Zoom out", icon: "mdi:magnify-minus-outline", act: () => this._zoomBy(1 / KEY_ZOOM) },
-      { name: "Zoom in", icon: "mdi:magnify-plus-outline", act: () => this._zoomBy(KEY_ZOOM) },
-      { name: "Turn left", icon: "mdi:rotate-left", act: () => this._turn(this._yaw - BUTTON_TURN, this._pitch) },
-      { name: "Turn right", icon: "mdi:rotate-right", act: () => this._turn(this._yaw + BUTTON_TURN, this._pitch) },
+      { name: name("3d.zoom_out"), icon: "mdi:magnify-minus-outline", act: () => this._zoomBy(1 / KEY_ZOOM) },
+      { name: name("3d.zoom_in"), icon: "mdi:magnify-plus-outline", act: () => this._zoomBy(KEY_ZOOM) },
+      { name: name("3d.turn_left"), icon: "mdi:rotate-left", act: () => this._turn(this._yaw - BUTTON_TURN, this._pitch) },
+      { name: name("3d.turn_right"), icon: "mdi:rotate-right", act: () => this._turn(this._yaw + BUTTON_TURN, this._pitch) },
     ];
   }
 
@@ -520,33 +606,37 @@ class Charger3dCard extends ChargerCard {
     </div>`;
   }
 
-  /** Enter or space on a port's tap area opens it; whether it did. */
-  _onPortKey(event) {
-    if (!this._tappable || (event.key !== "Enter" && event.key !== " ")) return false;
-    const port = portAt(event);
-    if (!port) return false;
+  /** Enter or space on a tap area (a port's, a control's) taps it; whether it did. */
+  _onTargetKey(event) {
+    if (event.key !== "Enter" && event.key !== " ") return false;
+    const id = this._targetAt(event);
+    if (!id) return false;
     event.preventDefault();
-    this._openPort(port);
+    this._activate(id);
     return true;
   }
 
-  /** Not rotatable: a click on a port opens it. */
+  /** Not rotatable: a click on a port or a control taps it. */
   _onClick(event) {
-    const port = this._tappable ? portAt(event) : undefined;
-    if (port) this._openPort(port);
+    const id = this._targetAt(event);
+    if (id) this._activate(id);
   }
 
-  /** Open a port's power sensor (its history), as Home Assistant's cards do. */
+  /** A tap on a port (its history) or a control. */
+  _activate(id) {
+    if (id === "knob") this._wake();
+    else if (id === "dimmer") this._stepBrightness(-BRIGHTNESS.step, id);
+    else if (id === "brighter") this._stepBrightness(BRIGHTNESS.step, id);
+    else this._openPort(id);
+  }
+
+  /** Open a port's power sensor (its history). */
   _openPort(id) {
-    const entityId = this._charger?.ports.find((port) => port.id === id)?.power;
-    if (!entityId) return;
-    this.dispatchEvent(
-      new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }),
-    );
+    this._showMoreInfo(this._charger?.ports.find((port) => port.id === id)?.power);
   }
 
   _onKeyDown(event) {
-    if (this._onPortKey(event)) return;
+    if (this._onTargetKey(event)) return;
     const turns = {
       ArrowLeft: [-KEY_STEP, 0],
       ArrowRight: [KEY_STEP, 0],
@@ -567,6 +657,99 @@ class Charger3dCard extends ChargerCard {
     event.preventDefault();
   }
 
+  // --- The knob and the arrows ---------------------------------------------
+
+  /** The screen's brightness: the one being set, else the charger's (null: unknown). */
+  _brightness() {
+    if (this._brightnessTarget !== undefined) return this._brightnessTarget;
+    const id = this._charger?.screen?.brightness;
+    const value = Number(id ? this.hass.states[id]?.state : NaN);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  /** The controls the card shows: [{id, label, disabled}] (charger-model.js). */
+  _screenControls() {
+    const screen = this._charger?.screen || {};
+    const available = (id) => {
+      const state = id && this.hass.states[id]?.state;
+      return Boolean(state) && state !== "unavailable";
+    };
+    const controls = [];
+    if (this._config?.knob !== "none" && screen.wake) {
+      controls.push({ id: "knob", label: t(this.hass, "3d.wake"), disabled: !available(screen.wake) });
+    }
+    if (this._config?.arrows === "brightness" && screen.brightness) {
+      const value = available(screen.brightness) ? this._brightness() : null;
+      controls.push(
+        { id: "dimmer", label: t(this.hass, "3d.dimmer"), disabled: value === null || value <= BRIGHTNESS.min },
+        { id: "brighter", label: t(this.hass, "3d.brighter"), disabled: value === null || value >= BRIGHTNESS.max },
+      );
+    }
+    return controls;
+  }
+
+  _setBusy(id, busy) {
+    const next = new Set(this._busy);
+    if (busy) next.add(id);
+    else next.delete(id);
+    this._busy = next;
+  }
+
+  /** The knob: press the Wake screen button (the page estimate follows). */
+  async _wake() {
+    const control = this._screenControls().find((item) => item.id === "knob");
+    if (!control || control.disabled || this._busy.has("knob")) return;
+    this._setBusy("knob", true);
+    try {
+      await this.hass.callService("button", "press", { entity_id: this._charger.screen.wake });
+    } catch {
+      // Home Assistant shows the error
+    } finally {
+      this._setBusy("knob", false);
+    }
+  }
+
+  /** An arrow: the brightness shown at once, sent once the taps stop. */
+  _stepBrightness(delta, id) {
+    const control = this._screenControls().find((item) => item.id === id);
+    const current = this._brightness();
+    if (!control || control.disabled || current === null) return;
+    const next = Math.max(BRIGHTNESS.min, Math.min(BRIGHTNESS.max, current + delta));
+    this._brightnessTarget = next;
+    this._brightnessArrow = id;
+    this._showNote(t(this.hass, "3d.brightness", { value: next }));
+    clearTimeout(this._brightnessTimer);
+    this._brightnessTimer = setTimeout(() => this._sendBrightness(), BRIGHTNESS_SEND_DELAY);
+  }
+
+  async _sendBrightness() {
+    clearTimeout(this._brightnessTimer);
+    this._brightnessTimer = undefined;
+    const value = this._brightnessTarget;
+    const arrow = this._brightnessArrow;
+    const entityId = this._charger?.screen?.brightness;
+    if (value === undefined || !entityId) return;
+    this._setBusy(arrow, true);
+    try {
+      await this.hass.callService("number", "set_value", { entity_id: entityId, value });
+    } catch {
+      // Home Assistant shows the error; the charger's value shows again
+    } finally {
+      this._setBusy(arrow, false);
+      // unless more taps came meanwhile: the charger's value from now on
+      if (this._brightnessTarget === value && !this._brightnessTimer) this._brightnessTarget = undefined;
+    }
+  }
+
+  /** A short note on the screen (the brightness being set). */
+  _showNote(text) {
+    this._note = text;
+    clearTimeout(this._noteTimer);
+    this._noteTimer = setTimeout(() => {
+      this._note = this._noteTimer = undefined;
+    }, NOTE_TIME);
+  }
+
   // --- Drawing ---------------------------------------------------------------
 
   _renderCharger(charger) {
@@ -581,6 +764,10 @@ class Charger3dCard extends ChargerCard {
       cables: this._config.show_cables !== false,
       tappable: this._tappable,
       hovered: this._hover,
+      portLabel: (port) => t(this.hass, "port.history", { port }),
+      controls: this._screenControls(),
+      busy: this._busy,
+      brightness: this._brightness(),
     });
     if (!this._canRotate) {
       return html`<ha-card>
@@ -588,7 +775,7 @@ class Charger3dCard extends ChargerCard {
           class=${offline ? "offline" : ""}
           title=${charger.name}
           @click=${this._onClick}
-          @keydown=${this._onPortKey}
+          @keydown=${this._onTargetKey}
           @pointermove=${this._onHover}
           @pointerleave=${this._onLeave}
         >
@@ -602,11 +789,14 @@ class Charger3dCard extends ChargerCard {
         class="rotatable ${offline ? "offline" : ""}"
         title=${charger.name}
         tabindex="0"
-        aria-label="${charger.name}: drag or use the arrow keys to turn it, + and - to zoom"
+        role="application"
+        aria-roledescription=${t(this.hass, "3d.view")}
+        aria-label=${t(this.hass, "3d.label", { name: charger.name })}
         @pointerdown=${this._onPointerDown}
         @pointermove=${this._onPointerMove}
         @pointerup=${this._onPointerUp}
         @pointercancel=${this._onPointerUp}
+        @lostpointercapture=${this._onPointerUp}
         @pointerleave=${this._onLeave}
         @wheel=${this._onWheel}
         @dblclick=${this._onDoubleClick}
@@ -620,6 +810,7 @@ class Charger3dCard extends ChargerCard {
 
   /** What the screen shows (chargerModel's `screen`). */
   _screen(charger, total) {
+    if (this._note) return { mode: "note", text: this._note };
     const mode = this._page(charger);
     if (mode === "off") return { mode };
     // the clock once the screensaver is known; dark until then (the first
@@ -630,20 +821,26 @@ class Charger3dCard extends ChargerCard {
     return { mode: "power", total };
   }
 
-  /** The clock screensaver's drawing, or undefined while it isn't known. */
+  /** The clock screensaver's drawing, or undefined while it isn't known.
+   * Drawn again only when what it shows changed (the minute, a setting). */
   _screensaverContent(charger) {
     const screensaver = this._screensaver;
     if (!screensaver?.kind) return undefined;
     const state = (id) => (id ? this.hass.states[id]?.state : undefined);
     const screen = charger.screen || {};
-    return screensaverDrawing({
+    const now = this._now || new Date();
+    const options = {
       kind: screensaver.kind,
       imageUrl: screensaver.image_url,
       // the charger always shows the time on stock themes
       showTime: screensaver.kind === "stock" || state(screen.time_display) === "on",
-      now: this._now || new Date(),
       clock24h: state(screen.clock_format) === "24h",
-    });
+    };
+    const key = JSON.stringify({ ...options, minute: Math.floor(now.getTime() / 60000) });
+    if (key !== this._drawing?.key) {
+      this._drawing = { key, content: screensaverDrawing({ ...options, now }) };
+    }
+    return this._drawing.content;
   }
 
   static styles = [

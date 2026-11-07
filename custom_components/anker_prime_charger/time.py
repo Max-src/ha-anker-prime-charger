@@ -62,6 +62,8 @@ class ScheduleTime(PrimeChargerEntity, TimeEntity):
         self._attr_translation_key = (
             f"schedule_{part}_time" if port else f"clock_display_{part}"
         )
+        # A port's schedule: disabled by default, like its switch
+        self._attr_entity_registry_enabled_default = port is None
 
     @property
     def native_value(self) -> time | None:

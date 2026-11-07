@@ -20,6 +20,15 @@ refreshed in the background.
 
 What wakes the charger's screen (a command, a device plugged in or out) is
 noted in screen_woke, for the estimate of what the screen shows (screen.py).
+
+A dropped MQTT connection is left to paho, which reconnects by itself (its
+network thread keeps running). Only when it hasn't managed after
+MQTT_RECONNECT_GRACE is the session replaced, its thread stopped in the
+executor (stopping it joins the thread).
+
+The charger's firmware versions (message 0830) are asked for at the first
+poll, then daily and after a firmware update; the charger's firmware in the
+device registry follows them.
 """
 
 from __future__ import annotations
@@ -34,10 +43,11 @@ from paho.mqtt.client import MQTT_ERR_SUCCESS
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from . import issues, screen
+from . import issues, library, screen
 from .cloud import CloudSettings
 from .const import (
     CONF_SCAN_INTERVAL,
@@ -48,7 +58,14 @@ from .const import (
 )
 from .fast_updates import FastUpdates
 from .helpers import to_int, translated
-from .mqtt_extensions import EASTER_EGG_STATE, EXTRA_STATE_KEYS
+from .mqtt_extensions import (
+    EASTER_EGG_STATE,
+    EXTRA_STATE_KEYS,
+    LIVE_VALUES_MESSAGE,
+    SW_VERSION_STATE,
+    VERSION_REQUEST_COMMAND,
+    VERSION_REQUEST_PARAMETER,
+)
 from .solixapi.api import AnkerSolixApi
 from .solixapi.mqtt_charger import SolixMqttDeviceCharger
 from .solixapi.mqttcmdmap import SolixMqttCommands
@@ -66,6 +83,16 @@ MIN_STALE_TIME: Final = timedelta(seconds=90)
 THEME_REQUEST_POLLS: Final = 10
 # Keys the library changes on every message: not a change of the charger's values
 MESSAGE_KEYS: Final = ("last_update",)
+# How long paho may take to reconnect by itself before the session is replaced
+MQTT_RECONNECT_GRACE: Final = timedelta(seconds=90)
+# How often the firmware versions are asked for (also after a firmware update)
+VERSIONS_INTERVAL: Final = timedelta(days=1)
+# The status key that is 1 while a firmware update is installed
+OTA_BUSY_STATE: Final = "ota_busy"
+
+
+class MqttReconnecting(UpdateFailed):
+    """The MQTT connection is down and paho is still reconnecting."""
 
 
 class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -102,6 +129,12 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.last_message: datetime | None = None
         self._got_data = asyncio.Event()
         self._polls = 0
+        # Since when the MQTT connection is down (None while connected)
+        self._mqtt_down_since: datetime | None = None
+        # The last live port values message (0303; fast updates)
+        self.last_live_message: datetime | None = None
+        # When the firmware versions were last asked for
+        self._versions_requested: datetime | None = None
         self._cloud_task: asyncio.Task[None] | None = None
         self._egg_listeners: set[Callable[[int], None]] = set()
         # While the library handles a message: whether it reported new values
@@ -126,14 +159,29 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # --- MQTT -----------------------------------------------------------------
 
     async def async_ensure_mqtt(self) -> SolixMqttDeviceCharger:
-        """(Re)connect to the MQTT broker and subscribe; return the charger's MQTT device."""
+        """(Re)connect to the MQTT broker and subscribe; return the charger's MQTT device.
+
+        Raises MqttReconnecting while paho reconnects a dropped connection.
+        """
         session = self.api.mqttsession
-        if not (session and session.is_connected()):
+        if session and not session.is_connected():
+            now = dt_util.utcnow()
+            if self._mqtt_down_since is None:
+                self._mqtt_down_since = now
+            if now - self._mqtt_down_since < MQTT_RECONNECT_GRACE:
+                raise translated(MqttReconnecting, "mqtt_reconnecting")
+            LOGGER.debug("MQTT did not reconnect by itself: starting a new session")
+            await library.async_stop_mqtt(self.hass, self.api)
+            session = None
+        self._mqtt_down_since = None
+        if not session:
             LOGGER.debug("Connecting to Anker MQTT server")
-            session = await self.api.startMqttSession(
+            session = await library.async_start_mqtt(
+                self.hass,
+                self.api,
                 # the library's MessageCallback says bool for the 7th argument;
                 # it passes the decoded values (dict), as _mqtt_message expects
-                message_callback=self._mqtt_message  # type: ignore[arg-type]
+                self._mqtt_message,  # type: ignore[arg-type]
             )
             if not session:
                 raise translated(UpdateFailed, "mqtt_connect_failed")
@@ -183,9 +231,12 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         finally:
             self._in_message = False
         changed = self._message_changed
-        device_sn, values = args[5], args[6]
-        if device_sn == self.device_sn and values:
-            changed = self._async_extra_values(values) or changed
+        data, device_sn, values = args[3], args[5], args[6]
+        if device_sn == self.device_sn:
+            if library.message_type(data) == LIVE_VALUES_MESSAGE:
+                self.last_live_message = dt_util.utcnow()
+            if values:
+                changed = self._async_extra_values(values) or changed
         if changed:
             self._async_handle_mqtt_update()
 
@@ -240,6 +291,7 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data = self._snapshot()
         if self.data is not None and screen.plugged_changed(self.data, data):
             self.screen_woke = dt_util.utcnow()
+        self._async_check_firmware(self.data or {}, data)
         unchanged = self.data is not None and _values(data) == _values(self.data)
         self.data = data
         if force or not unchanged:
@@ -248,6 +300,19 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _snapshot(self) -> dict[str, Any]:
         """Copy of the charger's decoded values."""
         return dict(self.device.get("mqtt_data") or {})
+
+    @callback
+    def _async_check_firmware(self, old: dict[str, Any], new: dict[str, Any]) -> None:
+        """Ask for the versions again after an update; keep the registry's firmware."""
+        if to_int(old.get(OTA_BUSY_STATE)) and not to_int(new.get(OTA_BUSY_STATE)):
+            self._versions_requested = None
+        version = new.get(SW_VERSION_STATE)
+        if not version or version == old.get(SW_VERSION_STATE):
+            return
+        registry = dr.async_get(self.hass)
+        device = registry.async_get(self.charger_device_id)
+        if isinstance(device, dr.DeviceEntry) and device.sw_version != version:
+            registry.async_update_device(device.id, sw_version=str(version))
 
     @callback
     def async_add_easter_egg_listener(
@@ -273,12 +338,22 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         # before anything else: also when the MQTT connection keeps failing
         issues.async_check_offline(self.hass, self.config_entry)
-        mdev = await self.async_ensure_mqtt()
+        try:
+            mdev = await self.async_ensure_mqtt()
+        except MqttReconnecting:
+            # Keep the values while paho reconnects, as long as they are fresh
+            if self.last_message and (
+                dt_util.utcnow() - self.last_message <= self.stale_after
+            ):
+                LOGGER.debug("MQTT connection down; paho is reconnecting")
+                return self._snapshot()
+            raise
         if await mdev.status_request() is None:
             raise translated(UpdateFailed, "status_request_failed")
         if self._polls % THEME_REQUEST_POLLS == 0:
             await mdev.run_command(cmd=SolixMqttCommands.theme_request)
         self._polls += 1
+        await self._async_request_versions(mdev)
         if self.cloud.refresh_due():
             self._start_cloud_refresh()
         if (
@@ -298,6 +373,23 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except TimeoutError as err:
                 raise translated(UpdateFailed, "no_mqtt_answer") from err
         return self._snapshot()
+
+    async def _async_request_versions(self, mdev: SolixMqttDeviceCharger) -> None:
+        """Ask for the firmware versions (answered with 0830) when due."""
+        now = dt_util.utcnow()
+        if (
+            self._versions_requested is not None
+            and now - self._versions_requested < VERSIONS_INTERVAL
+        ):
+            return
+        self._versions_requested = now
+        if user_id := library.account_id(self.api):
+            # a failure only means the versions come at the next request
+            await mdev.run_command(
+                cmd=VERSION_REQUEST_COMMAND,
+                value=user_id,
+                parm=VERSION_REQUEST_PARAMETER,
+            )
 
     # --- Cloud settings -------------------------------------------------------
 
@@ -340,36 +432,48 @@ class PrimeChargerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         resp = await mdev.run_command(
             cmd=cmd, value=value, parm=parm, parm_map=dict(parm_map or {})
         )
-        if cmd not in screen.QUIET_COMMANDS:
+        # a wake shows (the page estimate) even when no value changed
+        woke = cmd not in screen.QUIET_COMMANDS
+        if woke:
             self.screen_woke = dt_util.utcnow()
-        self._async_apply_reply(resp, cmd, expected)
+        self._async_apply_reply(resp, cmd, expected, force=woke)
 
     async def async_set_custom_profile(self, number: int | str) -> None:
         """Apply a saved custom profile (the library builds the command from it)."""
         mdev = await self.async_ensure_mqtt()
         resp = await mdev.set_custom_usage_profile(number=number)
         self.screen_woke = dt_util.utcnow()
-        self._async_apply_reply(resp, f"custom profile {number}")
+        self._async_apply_reply(resp, f"custom profile {number}", force=True)
 
     @callback
     def _async_apply_reply(
-        self, resp: Any, what: str, expected: dict[str, Any] | None = None
+        self,
+        resp: Any,
+        what: str,
+        expected: dict[str, Any] | None = None,
+        *,
+        force: bool = False,
     ) -> None:
         if not isinstance(resp, dict):
             raise translated(HomeAssistantError, "command_refused", command=what)
-        self.async_apply_state(resp | (expected or {}))
+        self.async_apply_state(resp | (expected or {}), force=force)
 
     @callback
-    def async_apply_state(self, updates: dict[str, Any]) -> None:
-        """Apply expected states now so entities don't flip back until the next status."""
+    def async_apply_state(
+        self, updates: dict[str, Any], *, force: bool = False
+    ) -> None:
+        """Apply expected states now so entities don't flip back until the next status.
+
+        `force`: update the entities even if no value changed.
+        """
         if mqtt_data := self.device.get("mqtt_data"):
             mqtt_data.update({k: v for k, v in updates.items() if k in mqtt_data})
-            self._async_push()
+            self._async_push(force=force)
 
     async def async_stop(self) -> None:
         """Stop fast updates and disconnect MQTT (paho joins a thread: off-loop)."""
         self.fast_updates.stop()
-        await self.hass.async_add_executor_job(self.api.stopMqttSession)
+        await library.async_stop_mqtt(self.hass, self.api)
 
 
 def _values(data: dict[str, Any]) -> dict[str, Any]:

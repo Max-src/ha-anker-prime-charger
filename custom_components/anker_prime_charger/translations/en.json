@@ -92,6 +92,9 @@
     "button": {
       "refresh": {
         "name": "Refresh"
+      },
+      "wake_screen": {
+        "name": "Wake screen"
       }
     },
     "event": {
@@ -411,6 +414,11 @@
       "schedule_end_time": {
         "name": "Schedule end time"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
     }
   },
   "services": {
@@ -705,6 +713,9 @@
     }
   },
   "exceptions": {
+    "screen_timeout_unknown": {
+      "message": "The charger hasn't reported its screen Timeout yet; try again after the next status."
+    },
     "auth_failed": {
       "message": "Anker login failed: {error}"
     },
@@ -725,6 +736,9 @@
     },
     "mqtt_connect_failed": {
       "message": "Could not connect to the Anker MQTT server"
+    },
+    "mqtt_reconnecting": {
+      "message": "The connection to the Anker MQTT server dropped; reconnecting"
     },
     "mqtt_subscribe_failed": {
       "message": "MQTT subscription to {topic} failed: {reason}"
@@ -824,6 +838,9 @@
     },
     "clock_image_name_used": {
       "message": "Another custom clock image is already named {name}"
+    },
+    "clock_image_added_unnamed": {
+      "message": "The image was added as {name}, but naming it failed: {error}"
     },
     "clock_image_upload_failed": {
       "message": "The image couldn't be uploaded to the Anker cloud ({reason})"

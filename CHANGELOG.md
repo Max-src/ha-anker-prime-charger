@@ -5,6 +5,58 @@ Notable changes to the Anker Prime Charger integration. Earlier versions are des
 
 ## [Unreleased]
 
+### Added
+
+- **Firmware** update entity on the charger: the installed firmware (as the charger reports
+  it), a newer one when the Anker cloud offers it (checked daily; install it in the Anker app),
+  and the progress while the charger installs it. The charger's firmware on its device page now
+  follows the charger.
+- Dashboard cards in French (and in English otherwise), following your Home Assistant language.
+- **Wake screen** button on the Screen device: wakes the charger's screen on its power page, as a
+  press on the knob does (it resends the screen's Timeout as it is).
+- 3D card: tap the **knob** to wake the charger's screen (option **Pressing the knob**, on by
+  default), and optional **arrows** beside the screen that dim and brighten it (option **Arrows
+  beside the screen**: Brightness). The card's screen dims with the brightness.
+
+### Changed
+
+- **Fewer entities enabled by default** (new installations only; existing entities keep their
+  setting): each port's Voltage and Current, the port schedules (Schedule start / end and their
+  times), port Labels, Custom protocols (+ preset) and the three test features. Enable them on
+  the device page when you need them.
+- **Port schedule days:** the days text and days preset entities of each port schedule are
+  removed (20 entities). The days are now the `weekdays` attribute of **Schedule start** /
+  **Schedule end**; change them with the **Set days** action. The clock screensaver keeps its
+  days entities.
+- **Charging mode:** custom profiles are listed by their name (`Desk`) instead of
+  `Custom: Desk`, which couldn't be translated. Update automations that select a profile.
+- **Fast updates** also send the real-time trigger the Anker app sends, which asks for 5 minutes
+  of readings. If the charger honours it (checked once, at the first fast updates), the trigger
+  is sent every 4.5 minutes instead of every 8 seconds; otherwise nothing changes.
+- **Energy** is added up with the mean of the power at two readings (trapezoidal rule), so a
+  device plugged in or out between two readings counts for half the interval.
+- The login cache and the MQTT certificates are kept in Home Assistant's `.storage` folder
+  instead of the integration's folder: they survive updates of the integration (no new login
+  after each one), and file names no longer contain the account's email. The old files are
+  deleted.
+- 3D card: the parts keep their place in the page while it turns (keyboard focus stays on the
+  port), a saved front view (0°) is restored as such, and the clock picture is fetched only when
+  needed.
+- Lit 3 for the cards.
+
+### Fixed
+
+- A dropped MQTT connection no longer blocks Home Assistant while it reconnects: paho's own
+  reconnection is left to work for 90 seconds (the values stay meanwhile), then the session is
+  replaced off the event loop.
+- Deleting the clock image on screen: if the cloud refuses, the screen now stays as it was
+  (it switched to Standard Style 1 first). Adding an image with a name: if naming it fails, the
+  error says under which name it was added.
+- The 3D card's screen stayed dark when the clock picture could not be downloaded; it now shows
+  the plain clock.
+- The picture download of the cards is limited in size, and not repeated when two cards ask at
+  once.
+
 ## [0.18.0] - 2026-10-31
 
 ### Added

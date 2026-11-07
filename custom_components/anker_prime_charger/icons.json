@@ -8,6 +8,9 @@
     "button": {
       "refresh": {
         "default": "mdi:refresh"
+      },
+      "wake_screen": {
+        "default": "mdi:gesture-tap-button"
       }
     },
     "event": {

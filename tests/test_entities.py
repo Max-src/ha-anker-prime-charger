@@ -51,7 +51,7 @@ async def test_energy(
     cloud: FakeCloud,
     setup_entry: MockConfigEntry,
 ) -> None:
-    """Energy adds up the power reported, until the next value arrives."""
+    """Energy adds up the mean of the power at two updates, times the time between."""
     assert state(hass, "sensor", "usbc_1_energy") == "0.0"
     assert attr(hass, "sensor", "usbc_1_energy", "state_class") == "total_increasing"
     assert attr(hass, "sensor", "total_output_energy", "device_class") == "energy"
@@ -67,15 +67,16 @@ async def test_energy(
     await hass.async_block_till_done()
     # all ports: 60 + 1.5 + 0.5 + 0 (USB-C) + 30 + 0 (USB-A) = 92 W
     await step({"usbc_1_power": 0.0})
-    assert state(hass, "sensor", "usbc_1_energy") == "0.001"  # 1 min at 60 W
-    assert state(hass, "sensor", "usba_1_energy") == "0.0005"
+    # 1 min from 60 W to 0 W: 30 W on average
+    assert state(hass, "sensor", "usbc_1_energy") == "0.0005"
+    assert state(hass, "sensor", "usba_1_energy") == "0.0005"  # 30 W
     assert state(hass, "sensor", "usba_2_energy") == "0.0"
-    assert state(hass, "sensor", "total_output_energy") == "0.001533"
+    assert state(hass, "sensor", "total_output_energy") == "0.001033"  # 92 to 32 W
 
     await step({"usba_1_power": 0.0})
-    assert state(hass, "sensor", "usbc_1_energy") == "0.001"  # + 1 min at 0 W
-    assert state(hass, "sensor", "usba_1_energy") == "0.001"
-    assert state(hass, "sensor", "total_output_energy") == "0.002067"  # + 32 W
+    assert state(hass, "sensor", "usbc_1_energy") == "0.0005"  # + 1 min at 0 W
+    assert state(hass, "sensor", "usba_1_energy") == "0.00075"  # + 30 to 0 W
+    assert state(hass, "sensor", "total_output_energy") == "0.001317"  # + 32 to 2 W
     assert (
         attr(hass, "sensor", "usba_2_energy", "friendly_name")
         == "250W Prime Charger USB-A A2 energy"
@@ -129,14 +130,41 @@ async def test_energy_is_restored(
     assert state(hass, "sensor", "usbc_1_energy") == "1.5"
 
 
-async def test_all_entities_enabled_by_default(
+@pytest.mark.default_entities
+async def test_entities_disabled_by_default(
     hass: HomeAssistant, setup_entry: MockConfigEntry
 ) -> None:
-    """No entity is created disabled."""
+    """Details few use are created disabled; everything else enabled."""
     registry = er.async_get(hass)
     entries = er.async_entries_for_config_entry(registry, setup_entry.entry_id)
-    assert entries
-    assert [e.entity_id for e in entries if e.disabled_by] == []
+    disabled = sorted(
+        e.unique_id.removeprefix(f"{SN}_") for e in entries if e.disabled_by
+    )
+    readings = [
+        f"{output}_{reading}"
+        for output in ("usbc_1", "usbc_2", "usbc_3", "usbc_4", "usba_1", "usba_2")
+        for reading in ("current", "voltage")
+    ]
+    ports = ("usbc_1", "usbc_2", "usbc_3", "usbc_4", "usba")
+    schedules = [
+        f"{port}_{part}{kind}"
+        for port in ports
+        for part in ("start", "end")
+        for kind in ("_switch", "_time")
+    ]
+    assert disabled == sorted(
+        [
+            *readings,
+            *schedules,
+            *(f"port_label_{p}" for p in ("c1", "c2", "c3", "c4", "a1", "a2")),
+            *(f"custom_usb_c{n}_protocols" for n in range(1, 5)),
+            *(f"custom_usb_c{n}_protocols_preset" for n in range(1, 5)),
+            "compatibility_status",
+            "charging_mode_status",
+            "charging_device_identity_status",
+        ]
+    )
+    assert len(entries) - len(disabled) > 40
 
 
 async def test_retired_entities_are_removed(
@@ -232,6 +260,7 @@ async def test_screen_device(hass: HomeAssistant, setup_entry: MockConfigEntry) 
         ("event", "hidden_animation"),
         ("sensor", "unlocked_animations"),
         ("sensor", "screen_page"),
+        ("button", "wake_screen"),
     ):
         assert device_of(platform, key) == screen.id, key
     # the rest stays on the charger

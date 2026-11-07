@@ -9,6 +9,7 @@ clock screensaver if it is on and within its hours and days, else goes dark.
 
 Turning the knob wakes it too, which Home Assistant can't see: then the
 estimate says clock or off while the power page shows, until the Timeout.
+The Wake screen button (button.py) resends the Timeout to wake it.
 """
 
 from __future__ import annotations

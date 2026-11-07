@@ -277,17 +277,17 @@ async def test_custom_profile_select(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     eid = entity_id(hass, "select", "usage_mode")
-    assert hass.states.get(eid).attributes["options"][-1] == "Custom: Desk"
+    assert hass.states.get(eid).attributes["options"][-1] == "Desk"
     published = len(cloud.mqtt.published)
 
-    await call(hass, "select", "select_option", eid, option="Custom: Desk")
+    await call(hass, "select", "select_option", eid, option="Desk")
     assert len(cloud.mqtt.published) == published + 1
     # profile number, auto exit, then C1..C4 and A power limits
     # 1, auto exit off, C1 100 W, C2 30 W, C3 0 W, C4 15 W, A 12 W
     assert last_command_field(cloud, "a3").endswith("0100641e000f0f")
     data = entry.runtime_data.data
     assert data["usage_mode"] == 5
-    assert hass.states.get(eid).state == "Custom: Desk"
+    assert hass.states.get(eid).state == "Desk"
 
     await call(hass, "select", "select_option", eid, option="low_power")
     assert hass.states.get(eid).state == "low_power"
@@ -428,11 +428,11 @@ async def test_custom_mode_switch_unlocks_profiles(
 ) -> None:
     """Turning on Custom charging mode adds the custom profiles to Charging mode."""
     options = attr(hass, "select", "usage_mode", "options")
-    assert "Custom: Desk" not in options
+    assert "Desk" not in options
     await call(
         hass, "switch", "turn_on", entity_id(hass, "switch", "charging_mode_status")
     )
-    assert attr(hass, "select", "usage_mode", "options")[-1] == "Custom: Desk"
+    assert attr(hass, "select", "usage_mode", "options")[-1] == "Desk"
 
 
 async def test_test_feature_cloud_error(

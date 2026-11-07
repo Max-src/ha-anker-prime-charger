@@ -25,6 +25,8 @@ name, length, type, value) and an XOR checksum. The vendored library encodes and
 | Full status               | Status request `0200` → message `0a00`                                                                                                                                                                                                         | Library                                                        |
 | Theme message             | Theme request `0202` → message `0a02` (theme id and link, clock flags, time display)                                                                                                                                                           | Library                                                        |
 | Live port values          | Real-time trigger `020b` (no parameters) → message `0303` every second for 10 s                                                                                                                                                                | Verified: 10 messages, last at 10.2 s                          |
+| Live values, longer       | Real-time trigger `0057`: `a2` `01` on / `00` off, `a3` the seconds (2 bytes; the app sends 300) → message `0303` every second for that long?                                                                                                    | The app sends it; the integration checks at run time whether the values keep coming (fast_updates.py) |
+| Firmware versions         | `0030` with `a2` the account's user id (text, no length byte) → `0830`: `a1` `v0.2.9.7`, `a2` `v2.1.1.6` (the firmware the cloud lists), `a3`-`a5` the parts' names (`A2345`, `A2345_mcu`, `A2345_esp32`; which part `a1` is is not known)       | Captured from the app (2026-10); the integration asks daily      |
 | Hidden animation played   | Message `0305`, field `a2` = animation type                                                                                                                                                                                                    | Verified (type 5 after unplugging a port 10 times within 60 s) |
 | Port faults, overheating  | Status `0a00` field `a3`: bit 0 overheating, bits 1-4 USB-C 1-4, bit 5 USB-A (set after 5 readings with a fault, cleared after 10 without)                                                                                                     | Library (upstream decoding); not seen on this charger          |
 | Firmware update           | Status `0a00` field `b2`: byte 0 busy (1 while an update is armed; the live values pause), byte 1 progress %; message `0306` during an update (`a2` state, `a3` progress)                                                                      | Library (upstream decoding); not seen on this charger          |
@@ -196,6 +198,15 @@ cloud messages but AES-GCM encryption and a different handshake.
   doesn't announce itself over mDNS or SSDP. No local IP API was found in that test; the integration
   currently uses Anker's cloud. This does not rule out local Bluetooth control through SolixBLE,
   which still needs a nearby advertisement and connection test on this charger.
+- **Matter, HomeKit:** no Prime charger is documented with either, and the charger announces no
+  Matter or HomeKit service (no mDNS at all, above).
+- **Bluetooth while on Wi-Fi (2026-11-07):** SolixBLE has a class for this charger
+  (`devices/prime_charger_250w.py`: per-port values, on/off, timers; pairing needs a press on the
+  dial). Its one reported test was with the charger removed from the app, and Anker's Wi-Fi
+  devices are reported to stop Bluetooth once on Wi-Fi. A passive scan from a PC found no
+  advertisement, but that PC saw only one device at all (weak radio), so it settles nothing.
+  To check: scan for the charger's Bluetooth address (on its device page in Home Assistant, under
+  Connections) next to the charger while it is on Wi-Fi.
 
 - **Renaming the charger:** `app/devicerelation/up_alias_name` needs `device_sn` + `alias_name` but
   answers "(10003) Failed to request"; five other candidates don't exist.

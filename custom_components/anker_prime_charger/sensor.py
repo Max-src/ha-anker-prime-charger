@@ -119,6 +119,9 @@ class PortReading(PrimeChargerEntity, SensorEntity):
         self._attr_translation_key = f"{port.output_prefix(output)}{description.key}"
         if description.key == "power":
             self._attr_extra_state_attributes = {"max_power": port.output_max_power}
+        else:
+            # voltage and current: details for few; enabled from the device page
+            self._attr_entity_registry_enabled_default = False
 
     @property
     def native_value(self) -> float | None:
@@ -159,9 +162,11 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
     """Energy delivered by some ports, for the Energy dashboard.
 
     The charger only reports power, so this adds up power x time at each
-    update (left Riemann sum: the power last reported lasts until the next
-    update). Time while the charger is unavailable or Home Assistant is
-    stopped isn't counted. The total is kept across restarts.
+    update (trapezoidal rule: the mean of the power at the last update and
+    now, so a device plugged in or out between two updates counts half the
+    interval, not all or nothing). Time while the charger is unavailable or
+    Home Assistant is stopped isn't counted. The total is kept across
+    restarts.
     """
 
     _needs_key = False
@@ -220,7 +225,8 @@ class EnergySensor(PrimeChargerEntity, RestoreSensor):
             since, last_power = self._last
             # a clock set back must not lower the total (seen as a meter reset)
             hours = max((now - since).total_seconds(), 0) / 3600
-            self._energy += max(last_power, 0.0) * hours / 1000
+            mean = (max(last_power, 0.0) + max(power, 0.0)) / 2
+            self._energy += mean * hours / 1000
         self._last = None if power is None else (now, power)
 
     @callback

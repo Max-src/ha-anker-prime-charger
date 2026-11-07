@@ -23,6 +23,15 @@ const MONTHS = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "
 const WEEKDAYS = ["Sun.", "Mon.", "Tues.", "Wed.", "Thur.", "Fri.", "Sat."];
 const SLANT = -8; // degrees: the digits lean right
 
+/**
+ * The transform of slanted digits `height` high with their top left at
+ * (x, y): skewed, and shifted so that they lean around their middle.
+ */
+function slanted(x, y, height) {
+  const shift = (height / 2) * Math.tan((-SLANT * Math.PI) / 180);
+  return `translate(${x} ${y}) skewX(${SLANT}) translate(${shift} 0)`;
+}
+
 function ordinal(day) {
   if (day % 100 >= 11 && day % 100 <= 13) return `${day}th`;
   return `${day}${{ 1: "st", 2: "nd", 3: "rd" }[day % 10] || "th"}`;
@@ -77,8 +86,7 @@ function timeDigits([hours, minutes], cx, cy, size) {
   const paths = [...hours, ...minutes].map((digit, i) => digitPath(digit, lefts[i], size)).join("");
   const bar = { width: stroke * 0.95, height: height * 0.3 };
   const colonX = 2 * width + gap + colon / 2 - bar.width / 2;
-  return svg`<g transform="translate(${cx - total / 2} ${cy - height / 2}) skewX(${SLANT})
-      translate(${(height / 2) * Math.tan((-SLANT * Math.PI) / 180)} 0)">
+  return svg`<g transform=${slanted(cx - total / 2, cy - height / 2, height)}>
     <path class="digit" d=${paths} stroke-width=${stroke} />
     <rect class="colon" x=${colonX} y=${height * 0.27 - bar.height / 2} width=${bar.width}
       height=${bar.height} rx=${bar.width / 2} />
@@ -123,8 +131,7 @@ function flipClock([hours, minutes], date) {
 
 /** One digit centred at (cx, cy), slanted like the time's. */
 function timeDigit(value, cx, cy, size) {
-  const shift = (size.height / 2) * Math.tan((-SLANT * Math.PI) / 180);
-  return svg`<g transform="translate(${cx - size.width / 2} ${cy - size.height / 2}) skewX(${SLANT}) translate(${shift} 0)">
+  return svg`<g transform=${slanted(cx - size.width / 2, cy - size.height / 2, size.height)}>
     <path class="digit" d=${digitPath(value, 0, size)} stroke-width=${size.stroke} />
   </g>`;
 }
@@ -132,8 +139,7 @@ function timeDigit(value, cx, cy, size) {
 /** The colon's two bars centred at (cx, cy), slanted like the digits. */
 function timeColon(cx, cy, { height, stroke }) {
   const bar = { width: stroke * 1.2, height: height * 0.24 };
-  const shift = (height / 2) * Math.tan((-SLANT * Math.PI) / 180);
-  return svg`<g class="flip-colon" transform="translate(${cx - bar.width / 2} ${cy - height / 2}) skewX(${SLANT}) translate(${shift} 0)">
+  return svg`<g class="flip-colon" transform=${slanted(cx - bar.width / 2, cy - height / 2, height)}>
     <rect class="colon" y=${height * 0.3 - bar.height / 2} width=${bar.width} height=${bar.height} rx=${bar.width / 2} />
     <rect class="colon" y=${height * 0.72 - bar.height / 2} width=${bar.width} height=${bar.height} rx=${bar.width / 2} />
   </g>`;

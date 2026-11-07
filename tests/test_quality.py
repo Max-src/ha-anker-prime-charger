@@ -121,7 +121,7 @@ async def test_device_has_its_addresses(
 
 def test_every_platform_sets_parallel_updates() -> None:
     """Read-only platforms 0, platforms that send commands 1."""
-    read_only = {"binary_sensor", "event", "sensor"}
+    read_only = {"binary_sensor", "event", "sensor", "update"}
     for platform in PLATFORMS:
         module = importlib.import_module(f"custom_components.{DOMAIN}.{platform}")
         assert (0 if platform in read_only else 1) == module.PARALLEL_UPDATES, platform

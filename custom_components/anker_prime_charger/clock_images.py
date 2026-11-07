@@ -16,6 +16,7 @@ image without a name shows as "Custom <seq>" (see themes.py).
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 import io
@@ -204,20 +205,9 @@ def check_name(
     return name
 
 
-async def async_add(
-    coordinator: PrimeChargerCoordinator,
-    data: bytes,
-    name: str | None = None,
-    fit: str = "fill",
-    show: bool = False,
-    frame: str = "none",
-) -> ClockImage:
-    """Upload an image as a new custom clock image, optionally show it."""
-    hass = coordinator.hass
+async def _async_upload(coordinator: PrimeChargerCoordinator, jpeg: bytes) -> int:
+    """Upload the prepared image and register it; return its id."""
     api, sn = coordinator.api, coordinator.device_sn
-    if name:
-        name = check_name(coordinator, name)
-    jpeg = await hass.async_add_executor_job(prepare, data, fit, frame)
     try:
         token = await library.async_request(
             api,
@@ -235,7 +225,7 @@ async def async_add(
             raise translated(
                 HomeAssistantError, "clock_image_upload_failed", reason="no upload link"
             )
-        async with async_get_clientsession(hass).put(
+        async with async_get_clientsession(coordinator.hass).put(
             uptoken, data=jpeg, headers={"Content-Type": CONTENT_TYPE}
         ) as resp:
             if resp.status >= 300:
@@ -250,20 +240,48 @@ async def async_add(
             {"sn": sn, "img_url": path, "hash_code": f"0x{zlib.crc32(jpeg):x}"},
         )
         await coordinator.cloud.async_refresh_custom_images()
-        image_id = coordinator.cloud.custom_id_of(path)
-        if image_id is None:
-            raise translated(
-                HomeAssistantError, "clock_image_upload_failed", reason="not listed"
-            )
-        if name:
-            await library.async_request(
-                api,
-                "rename_custom_theme",
-                {"sn": sn, "screensaver_id": image_id, "name": name},
-            )
-            await coordinator.cloud.async_refresh_custom_images()
     except CLOUD_ERRORS as err:
         raise translated(HomeAssistantError, "cloud_error", error=err) from err
+    image_id = coordinator.cloud.custom_id_of(path)
+    if image_id is None:
+        raise translated(
+            HomeAssistantError, "clock_image_upload_failed", reason="not listed"
+        )
+    return image_id
+
+
+async def async_add(
+    coordinator: PrimeChargerCoordinator,
+    data: bytes,
+    name: str | None = None,
+    fit: str = "fill",
+    show: bool = False,
+    frame: str = "none",
+) -> ClockImage:
+    """Upload an image as a new custom clock image, optionally show it."""
+    hass = coordinator.hass
+    api, sn = coordinator.api, coordinator.device_sn
+    if name:
+        name = check_name(coordinator, name)
+    jpeg = await hass.async_add_executor_job(prepare, data, fit, frame)
+    try:
+        image_id = await _async_upload(coordinator, jpeg)
+        if name:
+            try:
+                await library.async_request(
+                    api,
+                    "rename_custom_theme",
+                    {"sn": sn, "screensaver_id": image_id, "name": name},
+                )
+                await coordinator.cloud.async_refresh_custom_images()
+            except CLOUD_ERRORS as err:
+                # The image is there, under its "Custom <seq>" name: say so
+                raise translated(
+                    HomeAssistantError,
+                    "clock_image_added_unnamed",
+                    name=find(coordinator, image_id).name,
+                    error=err,
+                ) from err
     finally:
         coordinator.async_update_listeners()
     image = find(coordinator, image_id)
@@ -299,10 +317,11 @@ async def async_rename(
 
 
 async def async_delete(coordinator: PrimeChargerCoordinator, image: str | int) -> None:
-    """Delete a custom image; if it is on screen, show Standard Style 1 first."""
+    """Delete a custom image; if it was on screen, show Standard Style 1 then.
+
+    Deleted first: if the cloud refuses, the screen stays as it was.
+    """
     item = find(coordinator, image)
-    if item.on_screen:
-        await themes.async_set_theme(coordinator, theme=themes.STANDARD_STYLES[0])
     try:
         await library.async_request(
             coordinator.api, "delete_custom_theme", {"id": item.id}
@@ -312,6 +331,8 @@ async def async_delete(coordinator: PrimeChargerCoordinator, image: str | int) -
         raise translated(HomeAssistantError, "cloud_error", error=err) from err
     finally:
         coordinator.async_update_listeners()
+    if item.on_screen:
+        await themes.async_set_theme(coordinator, theme=themes.STANDARD_STYLES[0])
 
 
 async def async_preview_url(
@@ -322,17 +343,21 @@ async def async_preview_url(
 
 
 async def async_list(coordinator: PrimeChargerCoordinator) -> list[dict[str, Any]]:
-    """The custom images, each with a fresh preview link (valid a few minutes)."""
-    out = []
-    for item in images(coordinator):
-        preview = await async_preview_url(coordinator, item)
-        out.append(
-            {
-                "id": item.id,
-                "name": item.name,
-                "option": f"{themes.CUSTOM_CATEGORY} - {item.name}",
-                "on_screen": item.on_screen,
-                "preview_url": preview,
-            }
-        )
-    return out
+    """The custom images, each with a fresh preview link (valid a few minutes).
+
+    The links are asked for all at once (one cloud request per image).
+    """
+    items = images(coordinator)
+    previews = await asyncio.gather(
+        *(async_preview_url(coordinator, item) for item in items)
+    )
+    return [
+        {
+            "id": item.id,
+            "name": item.name,
+            "option": f"{themes.CUSTOM_CATEGORY} - {item.name}",
+            "on_screen": item.on_screen,
+            "preview_url": preview,
+        }
+        for item, preview in zip(items, previews, strict=True)
+    ]

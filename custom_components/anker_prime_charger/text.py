@@ -40,9 +40,6 @@ async def async_setup_entry(
             PortLabel(coordinator, port, output, remark)
             for output, remark in zip(port.outputs, port.remarks, strict=True)
         ]
-        entities += [
-            WeekdaysText(coordinator, port, part) for part in schedules.SCHEDULE_PARTS
-        ]
     entities += [PortProtocols(coordinator, port) for port in USB_C_PORTS]
     async_add_entities(entities)
 
@@ -73,8 +70,9 @@ def parse_list(
 class WeekdaysText(PrimeChargerEntity, TextEntity):
     """Weekdays, e.g. "mon,tue,wed,thu,fri"; 3-letter English names, "all" or "none".
 
-    Days of a port's scheduled start or end (see schedules.py), or (no port)
-    days on which the clock screen is shown.
+    The days on which the clock screen is shown (port None). A port
+    schedule's days are an attribute of its switch, set with the set_days
+    action (the text and preset entities there were too many).
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -123,6 +121,8 @@ class PortProtocols(PrimeChargerEntity, TextEntity):
 
     _attr_translation_key = "custom_protocols"
     _attr_entity_category = EntityCategory.CONFIG
+    # for the custom charging mode only (also set with set_protocols)
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator, port: Port) -> None:
         """Initialize."""
@@ -165,6 +165,7 @@ class PortLabel(PrimeChargerEntity, TextEntity):
     """Label of a physical port, as shown in the Anker app (stored in the Anker cloud)."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
     _attr_native_max = 20
     _needs_key = False
 

@@ -5,10 +5,14 @@
  * schema (its static editorSchema); the charger picker comes first. A card
  * can also complete the config it edits (its static completeConfig, e.g. an
  * id of its own): the completed config is reported, so it is saved.
+ *
+ * A schema's labels, helpers and button labels are keys of strings.js,
+ * shown in the user's language.
  */
 import { LitElement, html } from "./lib/lit-all.js";
 import { DOMAIN, MODEL_NAME } from "./charger.js";
 import { defineOnce } from "./registration.js";
+import { t } from "./strings.js";
 
 const DEVICE_FIELD = {
   name: "device",
@@ -16,9 +20,9 @@ const DEVICE_FIELD = {
   selector: { device: { filter: { integration: DOMAIN, model: MODEL_NAME } } },
 };
 
-/** Labels of the options, by name (a schema item can give its own: label). */
+/** The label of an option without its own (its strings.js key). */
 const LABELS = {
-  device: "Charger",
+  device: "editor.device",
 };
 
 /**
@@ -61,11 +65,21 @@ class ChargerCardEditor extends LitElement {
     return html`<ha-form
       .hass=${this.hass}
       .data=${this._withDefaults()}
-      .schema=${[DEVICE_FIELD, ...this.schema]}
-      .computeLabel=${(item) => item.label ?? LABELS[item.name] ?? item.name}
-      .computeHelper=${(item) => item.helper}
+      .schema=${this._localSchema()}
+      .computeLabel=${(item) => t(this.hass, item.label ?? LABELS[item.name] ?? item.name)}
+      .computeHelper=${(item) => (item.helper ? t(this.hass, item.helper) : undefined)}
       @value-changed=${this._valueChanged}
     ></ha-form>`;
+  }
+
+  /** The schema, with its buttons' labels in the user's language. */
+  _localSchema() {
+    return [DEVICE_FIELD, ...this.schema].map((item) => {
+      const options = item.selector?.button_toggle?.options;
+      if (!options) return item;
+      const translated = options.map((option) => ({ ...option, label: t(this.hass, option.label) }));
+      return { ...item, selector: { button_toggle: { ...item.selector.button_toggle, options: translated } } };
+    });
   }
 
   /** The config with the schema's defaults for unset options: ha-form shows

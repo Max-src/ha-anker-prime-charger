@@ -1,16 +1,19 @@
 {
   "name": "ha-anker-prime-charger-docs",
   "private": true,
-  "description": "Tooling of the documentation screenshots (docs/DOCUMENTATION_SCREENSHOTS.md)",
+  "description": "Tooling of the cards: the documentation screenshots (docs/DOCUMENTATION_SCREENSHOTS.md) and the Lit build (build:lit)",
   "scripts": {
     "docs:screenshots": "node tests/card-docs.cjs",
     "docs:pages": "node tests/ha-docs.cjs",
     "docs:readme": "node tests/card-docs-readme.cjs",
     "docs:check": "node tests/card-docs-readme.cjs --check",
     "docs:update": "npm run docs:screenshots && npm run docs:readme",
-    "test": "node --test tests/card-docs.test.mjs tests/readme-links.test.mjs"
+    "test": "node --test tests/card-docs.test.mjs tests/readme-links.test.mjs",
+    "build:lit": "esbuild scripts/lit-all.entry.js --bundle --format=esm --minify --target=es2021 --legal-comments=eof --outfile=custom_components/anker_prime_charger/www/lib/lit-all.js"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
+    "lit": "3.3.3",
     "playwright": "1.58.2",
     "pngjs": "7.0.0"
   }

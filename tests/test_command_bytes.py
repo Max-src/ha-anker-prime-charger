@@ -111,6 +111,8 @@ def test_every_command_is_covered() -> None:
         "knob_mode_select",
         "port_priority",
         "realtime_trigger",
+        mqtt_extensions.TIMED_TRIGGER_COMMAND,
         "theme_request",
+        mqtt_extensions.VERSION_REQUEST_COMMAND,
     }
     assert sent_by_the_integration <= covered

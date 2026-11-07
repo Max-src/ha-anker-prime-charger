@@ -16,8 +16,10 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.anker_prime_charger import clock_images
 from custom_components.anker_prime_charger.const import DOMAIN
+from custom_components.anker_prime_charger.library import ENDPOINTS
+from custom_components.anker_prime_charger.solixapi.errors import AnkerSolixError
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.setup import async_setup_component
 
 from .conftest import S3_URL, FakeCloud, fresh_link
@@ -209,6 +211,44 @@ async def test_delete_clock_image(
     await act(hass, "delete_clock_image", image="Custom 2")
     assert len(commands) == sent
     assert custom_options(hass) == []
+
+
+async def test_delete_refused_keeps_the_screen(
+    hass: HomeAssistant, cloud: FakeCloud, setup_entry: MockConfigEntry, commands: list
+) -> None:
+    """A delete the cloud refuses leaves the image and the screen as they were."""
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {
+            "entity_id": entity_id(hass, "select", "theme_id"),
+            "option": "Custom - Fireworks",
+        },
+        blocking=True,
+    )
+    cloud.rest[ENDPOINTS["delete_custom_theme"]] = AnkerSolixError("refused")
+    sent = len(commands)
+    with pytest.raises(HomeAssistantError):
+        await act(hass, "delete_clock_image", image="Fireworks")
+    assert len(commands) == sent
+    assert state(hass, "select", "theme_id") == "Custom - Fireworks"
+    assert "Custom - Fireworks" in custom_options(hass)
+
+
+async def test_add_clock_image_naming_fails(
+    hass: HomeAssistant,
+    cloud: FakeCloud,
+    storage: AiohttpClientMocker,
+    setup_entry: MockConfigEntry,
+    photo: Path,
+) -> None:
+    """The image is added; the error says under which name."""
+    cloud.rest[ENDPOINTS["rename_custom_theme"]] = AnkerSolixError("refused")
+    with pytest.raises(HomeAssistantError) as err:
+        await act(hass, "add_clock_image", path=str(photo), name="Beach")
+    assert err.value.translation_key == "clock_image_added_unnamed"
+    assert err.value.translation_placeholders["name"] == "Custom 3"
+    assert "Custom - Custom 3" in custom_options(hass)
 
 
 async def test_list_clock_images(

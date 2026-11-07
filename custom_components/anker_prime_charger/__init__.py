@@ -6,7 +6,7 @@ from typing import Final
 
 from aiohttp import ClientError
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import (
@@ -22,7 +22,9 @@ from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import charger_device_info
 from .frontend import async_remove_frontend, async_setup_frontend
 from .helpers import translated
-from .library import create_api
+from .library import async_create_api, remove_login_cache
+from .ports import PORTS
+from .schedules import SCHEDULE_PARTS
 from .services import async_setup_services
 from .solixapi import errors
 
@@ -38,6 +40,7 @@ PLATFORMS: Final = [
     Platform.SWITCH,
     Platform.TEXT,
     Platform.TIME,
+    Platform.UPDATE,
 ]
 
 # Entities that earlier versions created and that no longer exist:
@@ -46,6 +49,13 @@ RETIRED_ENTITIES: Final = (
     # flags of the cloud settings that turned out to do nothing
     (Platform.SWITCH, "_antiloss_mode_status"),
     (Platform.SWITCH, "_temperature_mode_status"),
+    # a port schedule's days: now an attribute of its switch (set_days action)
+    *(
+        (platform, f"_{port.key}_{part}_weekdays{suffix}")
+        for platform, suffix in ((Platform.TEXT, ""), (Platform.SELECT, "_preset"))
+        for port in PORTS
+        for part in SCHEDULE_PARTS
+    ),
 )
 
 
@@ -60,7 +70,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: PrimeChargerConfigEntry
 ) -> bool:
     """Set up the charger from a config entry."""
-    api = create_api(hass, entry.data, entry.data.get(CONF_SERVER))
+    api = await async_create_api(hass, entry.data, entry.data.get(CONF_SERVER))
     try:
         # A login reused from the library's cache returns False even though the
         # token is valid, so don't check the result. Bad or expired credentials
@@ -107,10 +117,19 @@ async def async_unload_entry(
 async def async_remove_entry(
     hass: HomeAssistant, entry: PrimeChargerConfigEntry
 ) -> None:
-    """Remove the entry's repair issues with it, and the cards with the last one."""
+    """Remove the entry's repair issues with it, and the cards with the last one.
+
+    The account's login cache goes with its last entry.
+    """
     issues.async_clear(hass, entry)
     hass.data.get(issues.DATA_SILENT_SINCE, {}).pop(entry.entry_id, None)
     others = hass.config_entries.async_entries(DOMAIN)
+    email = entry.data.get(CONF_EMAIL)
+    if email and not any(
+        other.entry_id != entry.entry_id and other.data.get(CONF_EMAIL) == email
+        for other in others
+    ):
+        await hass.async_add_executor_job(remove_login_cache, hass, email)
     if not any(other.entry_id != entry.entry_id for other in others):
         await async_remove_frontend(hass)
 

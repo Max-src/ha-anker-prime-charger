@@ -18,12 +18,11 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import custom_mode, schedules, themes
+from . import custom_mode, themes
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
 from .helpers import to_int, translated
 from .ports import (
-    PORTS,
     PRIORITY_NORMAL,
     PRIORITY_ON,
     PRIORITY_OPTIONS,
@@ -66,22 +65,24 @@ USAGE_MODE: Final = OptionSelectDescription(
         "low_power": (4, "low_power"),
     },
 )
+# The screen's Timeout (also resent by the Wake screen button, button.py)
+DISPLAY_TIMEOUT: Final = OptionSelectDescription(
+    key="display_timeout_mode",
+    screen=True,
+    translation_key="display_timeout_mode",
+    entity_category=EntityCategory.CONFIG,
+    command=SolixMqttCommands.display_timeout_mode_select,
+    parameter="set_display_timeout_mode",
+    value_map={
+        "never": (0, "0"),
+        "30s": (1, "30"),
+        "1min": (2, "60"),
+        "5min": (3, "300"),
+        "30min": (4, "1800"),
+    },
+)
 OPTION_SELECTS: Final[tuple[OptionSelectDescription, ...]] = (
-    OptionSelectDescription(
-        key="display_timeout_mode",
-        screen=True,
-        translation_key="display_timeout_mode",
-        entity_category=EntityCategory.CONFIG,
-        command=SolixMqttCommands.display_timeout_mode_select,
-        parameter="set_display_timeout_mode",
-        value_map={
-            "never": (0, "0"),
-            "30s": (1, "30"),
-            "1min": (2, "60"),
-            "5min": (3, "300"),
-            "30min": (4, "1800"),
-        },
-    ),
+    DISPLAY_TIMEOUT,
     OptionSelectDescription(
         key="knob_mode",
         screen=True,
@@ -119,11 +120,6 @@ async def async_setup_entry(
     ]
     entities += [
         OptionSelect(coordinator, description) for description in OPTION_SELECTS
-    ]
-    entities += [
-        WeekdaysPresetSelect(coordinator, port, part)
-        for port in PORTS
-        for part in schedules.SCHEDULE_PARTS
     ]
     entities += [ProtocolsPresetSelect(coordinator, port) for port in USB_C_PORTS]
     async_add_entities(entities)
@@ -164,10 +160,12 @@ class OptionSelect(PrimeChargerEntity, SelectEntity):
 
 
 class UsageModeSelect(OptionSelect):
-    """Charging mode: the built-in modes, plus "Custom: <name>" per custom profile.
+    """Charging mode: the built-in modes, plus each custom profile by its name.
 
     Custom profiles are offered once the "Custom charging mode" test feature is
     on. They are managed in the app or with the profile actions (services.py).
+    Their option is the profile's name as is (a name can't be translated; a
+    name that is also a built-in mode gets the profile's number added).
     """
 
     def _profiles(self) -> dict[str, dict[str, Any]]:
@@ -175,12 +173,16 @@ class UsageModeSelect(OptionSelect):
         cloud = self.coordinator.cloud
         if not cloud.device_settings.get("charging_mode_status"):
             return {}
-        return {
-            f"Custom: {profile.get('name') or profile.get('number')}": profile
-            for profile in sorted(
-                cloud.profiles.values(), key=lambda p: to_int(p.get("number")) or 0
-            )
-        }
+        profiles: dict[str, dict[str, Any]] = {}
+        for profile in sorted(
+            cloud.profiles.values(), key=lambda p: to_int(p.get("number")) or 0
+        ):
+            number = profile.get("number")
+            option = str(profile.get("name") or "").strip() or f"#{number}"
+            if option in self.entity_description.value_map or option in profiles:
+                option = f"{option} #{number}"
+            profiles[option] = profile
+        return profiles
 
     @property
     def options(self) -> list[str]:

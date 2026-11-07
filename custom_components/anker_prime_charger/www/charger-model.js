@@ -20,8 +20,19 @@
  * invisible, focusable area around it and its power (class "hit"), larger
  * than the port so that it is easy to tap. The `hovered` port's area is
  * tinted and its cable outlined: what a tap would open.
+ *
+ * `controls` add tap areas the same way (data-control="knob"): around the
+ * knob, and around two arrows drawn on the glass beside the display
+ * ("dimmer", "brighter"). A control in `busy` (its command on its way)
+ * pulses.
+ *
+ * Each drawn part has a key ("front", "side-3", "cable-c1"), so Lit moves its
+ * elements instead of drawing them anew when the parts are drawn in another
+ * order as the charger turns. The tap areas are drawn last, outside of the
+ * parts (invisible: their order doesn't show), so they are never moved: a
+ * focused one stays focused (a moved element loses the focus).
  */
-import { css, svg } from "./lib/lit-all.js";
+import { css, repeat, svg } from "./lib/lit-all.js";
 import { SCREEN } from "./charger-screensaver.js";
 
 // The body
@@ -46,12 +57,21 @@ const KNOB = { u: 25, v: H * 0.55, radius: 11, height: 6 };
 const USB_A = { ids: ["a1", "a2"], u: [67, 104], v: H * 0.55, width: 22, height: 9 };
 // Each USB-A port's power, on the side just above it
 const SIDE_POWER = { v: USB_A.v - 13 };
+// The arrows on the glass, either side of the display (their centres)
+const ARROWS = {
+  dimmer: { u: DISPLAY.u - 12, pointing: -1 },
+  brighter: { u: DISPLAY.u + DISPLAY.width + 12, pointing: 1 },
+  v: DISPLAY.v + DISPLAY.height / 2,
+  size: 4.5,
+};
 // The tap areas: from above a port's power to below the port (2D, mm)
 const HIT = {
   front: { width: USB_C.gap - 3, top: POWER_PAGE.port - 6, bottom: H - 3 },
   side: { width: 34, top: SIDE_POWER.v - 6, bottom: USB_A.v + USB_A.height / 2 + 4 },
+  // the arrows': above the USB-C ports' (from POWER_PAGE.port - 6)
+  arrow: { width: 22, top: ARROWS.v - 12, bottom: ARROWS.v + 10 },
+  knob: { radius: KNOB.radius + 4 },
 };
-// Plugs: their size around the port, length, narrowing; cords
 // Plugs (like Apple's braided cables): a soft white housing with rounded
 // edges, out of a thin metal collar; its size around the port, length,
 // narrowing; then the braided cord
@@ -156,7 +176,25 @@ function placement(view, s, u, v, out = 0) {
   return `matrix(${a} ${b} ${c} ${d} ${e - a * u - c * v} ${f - b * u - d * v})`;
 }
 
-/** A rounded rectangle's outline (2D points), corners of `r`. */
+/**
+ * The points around a rounded rectangle, `steps` per corner: `corners` are
+ * the corners' centres and the direction (degrees) each arc starts at, `r`
+ * their radius, `turn` +1 or -1 (the way the arcs go). Each point with the
+ * direction it faces ([cos, sin] of its angle).
+ */
+function roundedCorners(corners, r, steps, turn = 1) {
+  const points = [];
+  for (const [cx, cy, start] of corners) {
+    for (let i = 0; i <= steps; i++) {
+      const angle = ((start + (turn * 90 * i) / steps) * Math.PI) / 180;
+      const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
+      points.push({ x: cx + r * dx, y: cy + r * dy, dx, dy });
+    }
+  }
+  return points;
+}
+
+/** A rounded rectangle's outline (2D points, y down), corners of `r`. */
 function roundedRect(x, y, width, height, r) {
   const corners = [
     [x + width - r, y + r, -90],
@@ -164,14 +202,7 @@ function roundedRect(x, y, width, height, r) {
     [x + r, y + height - r, 90],
     [x + r, y + r, 180],
   ];
-  const points = [];
-  for (const [cx, cy, start] of corners) {
-    for (let i = 0; i <= CORNER_STEPS; i++) {
-      const angle = ((start + (90 * i) / CORNER_STEPS) * Math.PI) / 180;
-      points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
-    }
-  }
-  return points;
+  return roundedCorners(corners, r, CORNER_STEPS).map((p) => [p.x, p.y]);
 }
 
 const FRONT = surface([-W / 2, H / 2, D / 2], [1, 0, 0], [0, -1, 0], [0, 0, 1]);
@@ -189,15 +220,10 @@ function outline() {
     [-W / 2 + RADIUS, -H / 2 + RADIUS, -90], // bottom left: down to left
     [-W / 2 + RADIUS, H / 2 - RADIUS, -180], // top left: left to up
   ];
-  const points = [];
-  for (const [cx, cy, start] of corners) {
-    for (let i = 0; i <= CORNER_STEPS; i++) {
-      const angle = ((start - (90 * i) / CORNER_STEPS) * Math.PI) / 180;
-      const normal = [Math.cos(angle), Math.sin(angle), 0];
-      points.push({ point: [cx + RADIUS * normal[0], cy + RADIUS * normal[1]], normal });
-    }
-  }
-  return points;
+  return roundedCorners(corners, RADIUS, CORNER_STEPS, -1).map((p) => ({
+    point: [p.x, p.y],
+    normal: [p.dx, p.dy, 0],
+  }));
 }
 const OUTLINE = outline();
 
@@ -216,6 +242,7 @@ function bodySides(view) {
     if (!view.facing(facing, middle)) return null;
     const colour = view.shade(COLOURS.body, facing);
     return {
+      key: `side-${i}`,
       depth: view.project(middle)[2],
       draw: svg`<polygon points=${view.screen(corners)} fill=${colour} stroke=${colour}
         stroke-width="0.6" stroke-linejoin="round" />`,
@@ -224,11 +251,12 @@ function bodySides(view) {
 }
 
 /** A flat face of the body (its outline, then `details`), if seen. */
-function face(view, s, details) {
+function face(view, key, s, details) {
   const middle = at(s, W / 2, H / 2);
   if (!view.facing(s.normal, middle)) return null;
   const outline = FACE_OUTLINE.map(([u, v]) => at(s, u, v));
   return {
+    key,
     depth: view.project(middle)[2],
     draw: svg`<polygon points=${view.screen(outline)} fill=${view.shade(COLOURS.body, s.normal)} />
       ${details}`,
@@ -248,15 +276,43 @@ function port(view, s, id, u, v, width, height, radius, active) {
 }
 
 /** A port's tap area on a surface, around (u, v) from `top` to `bottom`. */
-function hitArea(view, s, id, u, { width, top, bottom }, hovered) {
+function hitArea(view, s, id, u, { width, top, bottom }, hovered, label) {
   const v = (top + bottom) / 2;
   return svg`<rect
     class="hit ${id === hovered ? "hover" : ""}"
     data-port=${id}
     tabindex="0"
     role="button"
-    aria-label="${id.toUpperCase()}: power history"
+    aria-label=${label(id.toUpperCase())}
     transform=${placement(view, s, u, v)}
+    x=${u - width / 2} y=${top} width=${width} height=${bottom - top} rx="3"
+  />`;
+}
+
+/** A control's tap area: around the knob's top, or around an arrow. */
+function controlArea(view, control, hovered, busy) {
+  const classes = ["hit", control.id === hovered ? "hover" : "", busy.has(control.id) ? "busy" : ""].join(" ");
+  if (control.id === "knob") {
+    return svg`<circle
+      class=${classes}
+      data-control="knob"
+      tabindex="0"
+      role="button"
+      aria-label=${control.label}
+      transform=${placement(view, RIGHT, KNOB.u, KNOB.v, KNOB.height)}
+      cx=${KNOB.u} cy=${KNOB.v} r=${HIT.knob.radius}
+    />`;
+  }
+  const { u } = ARROWS[control.id];
+  const { width, top, bottom } = HIT.arrow;
+  return svg`<rect
+    class=${classes}
+    data-control=${control.id}
+    tabindex="0"
+    role="button"
+    aria-label=${control.label}
+    aria-disabled=${control.disabled ? "true" : "false"}
+    transform=${placement(view, FRONT, u, (top + bottom) / 2)}
     x=${u - width / 2} y=${top} width=${width} height=${bottom - top} rx="3"
   />`;
 }
@@ -276,11 +332,34 @@ function frontText(view, cls, u, v, value, port = "") {
     x=${u} y=${v}>${value}</text>`;
 }
 
-/** What the screen shows (see chargerModel's `screen`), drawn on the glass. */
-function screenContent(view, screen) {
-  if (screen.mode === "clock") return display(view, screen.content);
+/** What the screen shows (see chargerModel's `screen`), drawn on the glass,
+ * dimmed by its brightness (20-100 %; less than the charger dims, so that it
+ * stays readable). A note isn't dimmed. */
+function screenContent(view, screen, brightness) {
   if (screen.mode === "off") return "";
-  return frontText(view, "screen", W / 2, POWER_PAGE.total, screen.total);
+  if (screen.mode === "note") return frontText(view, "screen", W / 2, POWER_PAGE.total, screen.text);
+  const content =
+    screen.mode === "clock"
+      ? display(view, screen.content)
+      : frontText(view, "screen", W / 2, POWER_PAGE.total, screen.total);
+  if (brightness === null || brightness === undefined) return content;
+  const level = Math.max(0, Math.min(1, (brightness - 20) / 80));
+  return svg`<g opacity=${(0.5 + 0.5 * level).toFixed(2)}>${content}</g>`;
+}
+
+/** The arrows beside the display, for the controls "dimmer" and "brighter". */
+function arrows(view, controls) {
+  return controls
+    .filter((control) => ARROWS[control.id])
+    .map((control) => {
+      const { u, pointing } = ARROWS[control.id];
+      const v = ARROWS.v;
+      const k = ARROWS.size;
+      const back = u - (pointing * k) / 2;
+      const tip = u + (pointing * k) / 2;
+      return svg`<polyline class="arrow ${control.disabled ? "disabled" : ""}" data-control=${control.id}
+        transform=${placement(view, FRONT, u, v)} points="${back},${v - k} ${tip},${v} ${back},${v + k}" />`;
+    });
 }
 
 /** Each USB-C port's power, just above it (over the screen). */
@@ -292,7 +371,7 @@ function usbCPower(view, portPower) {
   );
 }
 
-function frontFace(view, inUse, screen, portPower, tappable, hovered) {
+function frontFace(view, inUse, screen, portPower, controls, brightness) {
   const glass = roundedRect(
     GLASS.inset,
     GLASS.inset - 1,
@@ -303,20 +382,17 @@ function frontFace(view, inUse, screen, portPower, tappable, hovered) {
   const ports = USB_C.ids.map((id, i) =>
     port(view, FRONT, id, W / 2 + (i - 1.5) * USB_C.gap, USB_C.v, USB_C.width, USB_C.height, USB_C.height / 2, inUse.has(id)),
   );
-  const hits = tappable
-    ? USB_C.ids.map((id, i) => hitArea(view, FRONT, id, W / 2 + (i - 1.5) * USB_C.gap, HIT.front, hovered))
-    : "";
-  return face(view, FRONT, svg`
+  return face(view, "front", FRONT, svg`
     <polygon class="glass" points=${view.screen(glass)} fill=${COLOURS.glass} />
-    ${screenContent(view, screen)}
+    ${screenContent(view, screen, brightness)}
+    ${arrows(view, controls)}
     ${usbCPower(view, portPower)}
     ${ports}
-    ${hits}
   `);
 }
 
 /** The right side's details (its surface is one of the body's strips). */
-function rightDetails(view, inUse, portPower, tappable, hovered) {
+function rightDetails(view, inUse, portPower) {
   const middle = at(RIGHT, D / 2, H / 2);
   if (!view.facing(RIGHT.normal, middle)) return null;
   // the knob: discs stacked out from the side (its edge), then its top
@@ -341,13 +417,11 @@ function rightDetails(view, inUse, portPower, tappable, hovered) {
     return svg`<text class="side-power" data-port=${id} transform=${placement(view, RIGHT, u, SIDE_POWER.v)}
       x=${u} y=${SIDE_POWER.v}>${value}</text>`;
   });
-  const hits = tappable
-    ? USB_A.ids.map((id, i) => hitArea(view, RIGHT, id, USB_A.u[i], HIT.side, hovered))
-    : "";
   return {
+    key: "right",
     // just in front of the side, so drawn over it
     depth: view.project(middle)[2] + 0.01,
-    draw: svg`${ports}${power}${knob}${hits}`,
+    draw: svg`${ports}${power}${knob}`,
   };
 }
 
@@ -362,15 +436,7 @@ function roundedProfile(w, h, r) {
     [-w + r, h - r, 90],
     [-w + r, -h + r, 180],
   ];
-  const points = [];
-  for (const [cu, cv, start] of corners) {
-    for (let i = 0; i <= PLUG.steps; i++) {
-      const angle = ((start + (90 * i) / PLUG.steps) * Math.PI) / 180;
-      const [du, dv] = [Math.cos(angle), Math.sin(angle)];
-      points.push({ u: cu + r * du, v: cv + r * dv, du, dv });
-    }
-  }
-  return points;
+  return roundedCorners(corners, r, PLUG.steps).map((p) => ({ u: p.x, v: p.y, du: p.dx, dv: p.dy }));
 }
 
 /**
@@ -466,6 +532,7 @@ function cable(view, s, id, kind, u, v, width, height, spread, hovered) {
   const line = cord(view, plug.end, s.normal, spread);
   const depth = view.project(plug.centre)[2];
   return {
+    key: `cable-${id}`,
     depth: seen ? AFTER_BODY + depth : -AFTER_BODY + depth,
     draw: svg`<g class=${id === hovered ? "hover" : ""} data-port=${id}>
       ${seen ? svg`${plug.faces}${line}` : svg`${line}${[...plug.faces].reverse()}`}
@@ -483,7 +550,12 @@ function cable(view, s, id, kind, u, v, width, height, spread, hovered) {
  * (none: not written); `zoom`: 1 shows the whole charger, larger is nearer;
  * `cables`: a cable in each port in use (else only the port is lit);
  * `tappable`: each port gets a tap area (see the top of this file);
- * `hovered`: the id of the port under the mouse, highlighted.
+ * `hovered`: the id of the port under the mouse, highlighted; `portLabel`:
+ * a tap area's label, from its port's name ("C1"); `controls`: the knob's
+ * and the arrows' tap areas, [{id: "knob" | "dimmer" | "brighter", label,
+ * disabled}]; `busy`: the ids of the controls whose command is on its way;
+ * `brightness`: the screen's (20-100 %), dims what it shows. The screen can
+ * also show a short note: {mode: "note", text}.
  */
 export function chargerModel({
   yaw,
@@ -495,13 +567,17 @@ export function chargerModel({
   cables = true,
   tappable = false,
   hovered = undefined,
+  portLabel = (port) => `${port}: power history`,
+  controls = [],
+  busy = new Set(),
+  brightness = null,
 }) {
   const view = viewer(yaw, pitch);
   const items = [
     ...bodySides(view),
-    frontFace(view, inUse, screen, portPower, tappable, hovered),
-    face(view, BACK, ""),
-    rightDetails(view, inUse, portPower, tappable, hovered),
+    frontFace(view, inUse, screen, portPower, controls, brightness),
+    face(view, "back", BACK, ""),
+    rightDetails(view, inUse, portPower),
   ];
   USB_C.ids.forEach((id, i) => {
     if (!cables || !inUse.has(id)) return;
@@ -516,15 +592,35 @@ export function chargerModel({
     items.push(cable(view, RIGHT, id, "usb_a", USB_A.u[i], USB_A.v, USB_A.width, USB_A.height, spread, hovered));
   });
   const drawn = items.filter(Boolean).sort((a, b) => a.depth - b.depth);
-  return svg`<svg class=${tappable ? "tappable" : ""} viewBox=${viewBox(zoom)}
-    xmlns="http://www.w3.org/2000/svg" role=${tappable ? "group" : "img"}>
+  // the tap areas of the ports and controls on the surfaces seen
+  const hits = [];
+  const frontSeen = view.facing(FRONT.normal, at(FRONT, W / 2, H / 2));
+  const rightSeen = view.facing(RIGHT.normal, at(RIGHT, D / 2, H / 2));
+  if (tappable && frontSeen) {
+    USB_C.ids.forEach((id, i) =>
+      hits.push({ id, draw: hitArea(view, FRONT, id, W / 2 + (i - 1.5) * USB_C.gap, HIT.front, hovered, portLabel) }),
+    );
+  }
+  if (tappable && rightSeen) {
+    USB_A.ids.forEach((id, i) =>
+      hits.push({ id, draw: hitArea(view, RIGHT, id, USB_A.u[i], HIT.side, hovered, portLabel) }),
+    );
+  }
+  for (const control of controls) {
+    if (control.id === "knob" ? !rightSeen : !frontSeen) continue;
+    hits.push({ id: control.id, draw: controlArea(view, control, hovered, busy) });
+  }
+  const interactive = tappable || controls.length > 0;
+  return svg`<svg class=${interactive ? "tappable" : ""} viewBox=${viewBox(zoom)}
+    xmlns="http://www.w3.org/2000/svg" role=${interactive ? "group" : "img"}>
     <defs>
       <radialGradient id="knob-top" cx="0.4" cy="0.35" r="0.75">
         <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
         <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
       </radialGradient>
     </defs>
-    ${drawn.map((item) => item.draw)}
+    ${repeat(drawn, (item) => item.key, (item) => item.draw)}
+    ${repeat(hits, (hit) => hit.id, (hit) => hit.draw)}
   </svg>`;
 }
 
@@ -571,8 +667,42 @@ export const modelStyles = css`
   g.hover {
     filter: drop-shadow(0 0 1.5px var(--primary-color)) drop-shadow(0 0 1.5px var(--primary-color));
   }
-  .tappable [data-port]:not([data-port=""]) {
+  .tappable [data-port]:not([data-port=""]),
+  .tappable [data-control] {
     cursor: pointer;
+  }
+  .tappable [data-control][aria-disabled="true"] {
+    cursor: default;
+  }
+  /* a control whose command is on its way */
+  .hit.busy {
+    fill: color-mix(in srgb, var(--primary-color) 30%, transparent);
+    animation: busy 0.9s ease-in-out infinite alternate;
+  }
+  @keyframes busy {
+    from {
+      opacity: 0.35;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hit.busy {
+      animation: none;
+    }
+  }
+  /* the arrows beside the display */
+  .arrow {
+    fill: none;
+    stroke: #e8edf2;
+    stroke-width: 1.3px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.75;
+  }
+  .arrow.disabled {
+    opacity: 0.2;
   }
   .side-power {
     fill: #2f353c;

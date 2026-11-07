@@ -1518,6 +1518,52 @@
      }
     }
    ]
+  },
+  {
+   "command": "realtime_trigger_timed",
+   "value": 300,
+   "parameter": "trigger_timeout_sec",
+   "messages": [
+    {
+     "type": "0057",
+     "fields": {
+      "a1": "22",
+      "a2": "0101",
+      "a3": "022c01"
+     }
+    }
+   ]
+  },
+  {
+   "command": "realtime_trigger_timed",
+   "parameters": {
+    "set_realtime_trigger": "off",
+    "trigger_timeout_sec": 30
+   },
+   "messages": [
+    {
+     "type": "0057",
+     "fields": {
+      "a1": "22",
+      "a2": "0100",
+      "a3": "021e00"
+     }
+    }
+   ]
+  },
+  {
+   "command": "version_request",
+   "value": "0123456789abcdef0123456789abcdef01234567",
+   "parameter": "set_account_id",
+   "messages": [
+    {
+     "type": "0030",
+     "fields": {
+      "a1": "22",
+      "a2": "0030313233343536373839616263646566303132333435363738396162636465663031323334353637"
+     }
+    }
+   ]
   }
  ]
 }

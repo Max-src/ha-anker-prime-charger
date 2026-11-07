@@ -2,6 +2,9 @@
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "default_entities: entities enabled or disabled as the integration creates them",
+]
 
 [tool.ruff]
 target-version = "py313"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 
 from freezegun.api import FrozenDateTimeFactory
 from pytest_homeassistant_custom_component.common import (
@@ -10,13 +11,14 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.anker_prime_charger import library
 from custom_components.anker_prime_charger.const import DOMAIN
 from custom_components.anker_prime_charger.solixapi import errors
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 
-from .conftest import SN, FakeCloud
+from .conftest import EMAIL, SN, FakeCloud
 from .helpers import entity_id, state
 
 
@@ -28,7 +30,8 @@ async def test_setup_and_unload(
     mqtt = cloud.mqtt
     assert mqtt.subscriptions == {f"dt/anker_power/A2345/{SN}/#"}
     # the first poll: status request, then theme request (time display)
-    assert mqtt.published_types == ["0200", "0202"]
+    # status, theme, firmware versions
+    assert mqtt.published_types == ["0200", "0202", "0030"]
     assert (
         hass.states.get(entity_id(hass, "sensor", "total_output_power")).state == "10.8"
     )
@@ -159,17 +162,59 @@ async def test_mqtt_subscription_failure_retries(
     assert "failed: 4" in entry.reason
 
 
+async def test_login_cache_in_storage(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """The login cache goes to .storage, without the email in its name.
+
+    What earlier versions left in the library's folder is deleted; the cache
+    goes with the account's last entry.
+    """
+    old = library.LIBRARY_CACHE_DIR / f"{EMAIL}.json"
+
+    def leave_old_cache() -> None:
+        old.parent.mkdir(parents=True, exist_ok=True)
+        old.write_text("{}", encoding="utf-8")
+
+    await hass.async_add_executor_job(leave_old_cache)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert not await hass.async_add_executor_job(old.exists)
+
+    auth = Path(cloud.api.apisession._authFile)
+    assert auth.parent == Path(hass.config.path(".storage", DOMAIN))
+    assert EMAIL not in auth.name
+    await hass.async_add_executor_job(auth.write_text, "{}")
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert not await hass.async_add_executor_job(auth.exists)
+
+
 async def test_mqtt_reconnects_after_disconnect(
     hass: HomeAssistant,
     cloud: FakeCloud,
     setup_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    """A dropped MQTT connection is re-established and re-subscribed on next poll."""
-    cloud.mqtt.connected = False
+    """A dropped connection is left to paho for a while, then replaced.
+
+    Meanwhile the values stay (while fresh); the new session subscribes again.
+    """
+    first = cloud.mqtt
+    first.connected = False
     freezer.tick(timedelta(seconds=30))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
+    assert cloud.api.startMqttSession.await_count == 1  # paho is reconnecting
+    assert state(hass, "sensor", "usbc_1_power") == "6.3"
+
+    for _ in range(3):  # 90 s later: paho didn't manage
+        freezer.tick(timedelta(seconds=30))
+        async_fire_time_changed(hass)
+        # (the poll stops paho in the executor)
+        await hass.async_block_till_done(wait_background_tasks=True)
     assert cloud.api.startMqttSession.await_count == 2
+    assert cloud.mqtt is not first
     assert cloud.mqtt.connected
     assert cloud.mqtt.subscriptions == {f"dt/anker_power/A2345/{SN}/#"}
+    assert state(hass, "sensor", "usbc_1_power") == "6.3"

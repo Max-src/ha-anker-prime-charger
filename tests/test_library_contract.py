@@ -8,11 +8,12 @@ mqtt_extensions.py, ...) before updating the expectations.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 from paho.mqtt.client import MQTT_ERR_NO_CONN, MQTT_ERR_SUCCESS
 
-from custom_components.anker_prime_charger import mqtt_extensions, themes
+from custom_components.anker_prime_charger import library, mqtt_extensions, themes
 from custom_components.anker_prime_charger.solixapi import mqttcmdmap
 from custom_components.anker_prime_charger.solixapi.api import AnkerSolixApi
 from custom_components.anker_prime_charger.solixapi.apitypes import (
@@ -60,6 +61,10 @@ def test_private_session_attributes() -> None:
     api = AnkerSolixApi("a@b.c", "x", "DE", None, logging.getLogger("test"))
     assert hasattr(api.apisession, "_api_base")
     assert hasattr(api.apisession, "_region")
+    # library.create_api: the login cache's file; account_id: the user id
+    assert api.apisession._authFile.endswith("a@b.c.json")
+    api.apisession._login_response = {"user_id": "u1"}
+    assert api.apisession.get_login_info("user_id") == "u1"
     assert set(API_SERVERS) == {"eu", "com"}
     assert callable(api._update_account)  # library.store_stock_themes
 
@@ -79,6 +84,54 @@ def test_subscribe_result() -> None:
     session.client = None
     assert session.subscribe("later/#") is None
     assert "later/#" in session.subscriptions
+
+
+def test_mqtt_session_attributes() -> None:
+    """library.async_start_mqtt / async_stop_mqtt: certificate folder, paho client."""
+    api = AnkerSolixApi("a@b.c", "x", "DE", None, logging.getLogger("test"))
+    session = AnkerSolixMqttSession(apisession=api.apisession)
+    assert isinstance(session._auth_cache_dir, Path)
+    assert session.client is None
+    assert callable(session.cleanup)
+
+
+def test_versions_message_decoded() -> None:
+    """mqtt_extensions' 0830: the versions (as the charger sends them, 2026-10)."""
+    hexbytes = (
+        "ff09280003000f0830a1090076302e322e392e37a2090076322e312e312e36"
+        "a30600413233343505"
+    )
+    values = DeviceHexData(model="A2345", hexbytes=bytes.fromhex(hexbytes)).values()
+    assert values == {"hw_version": "v0.2.9.7", "sw_version": "v2.1.1.6"}
+    assert library.message_type(bytes.fromhex(hexbytes)) == "0830"
+    # kept by the cache update, without the "v"
+    kept = _cache_update(("sw_version",))
+    assert "sw_version" in kept
+
+
+async def test_ota_batch_stored() -> None:
+    """update.py reads what get_ota_batch stores: is_ota_update, ota_version."""
+    api = AnkerSolixApi("a@b.c", "x", "DE", None, logging.getLogger("test"))
+    api._update_dev(dict(DEVICE))
+    answer = {
+        "update_infos": [
+            {
+                "device_sn": SN,
+                "need_update": True,
+                "lastPackage": {"version": "v2.2.0.1"},
+                "current_version": "v2.1.1.6",
+            }
+        ]
+    }
+
+    async def request(method: str, endpoint: str, **kwargs: object) -> dict:
+        assert endpoint == API_ENDPOINTS["get_ota_batch"]
+        return {"code": 0, "data": answer}
+
+    api.apisession.request = request  # type: ignore[method-assign]
+    await api.get_ota_batch(deviceSns=[SN])
+    assert api.devices[SN]["is_ota_update"] is True
+    assert api.devices[SN]["ota_version"] == "2.2.0.1"
 
 
 def test_wifi_charger_takes_commands() -> None:
@@ -125,6 +178,8 @@ def test_a2345_commands() -> None:
         mqtt_extensions.COMPATIBILITY_COMMAND,
         mqtt_extensions.IDENTIFICATION_COMMAND,
         mqtt_extensions.CUSTOM_MODE_COMMAND,  # added by mqtt_extensions
+        mqtt_extensions.TIMED_TRIGGER_COMMAND,  # added by mqtt_extensions
+        mqtt_extensions.VERSION_REQUEST_COMMAND,  # added by mqtt_extensions
     ):
         assert command in names or command == "realtime_trigger", command
         assert command in FEATURES, command

@@ -18,7 +18,7 @@ from . import custom_mode, schedules, themes
 from .const import TEST_FEATURES
 from .coordinator import PrimeChargerConfigEntry, PrimeChargerCoordinator
 from .entity import PrimeChargerEntity
-from .helpers import is_on, on_off, to_int
+from .helpers import is_on, on_off, to_int, to_weekdays
 from .mqtt_extensions import (
     CUSTOM_MODE_COMMAND,
     CUSTOM_MODE_PARAMETER,
@@ -114,11 +114,16 @@ class PortTimerSwitch(ReportedSwitch):
 
 
 class PortScheduleSwitch(ReportedSwitch):
-    """Enable the scheduled start or end of a port (see schedules.py)."""
+    """Enable the scheduled start or end of a port (see schedules.py).
+
+    Its weekdays are the "weekdays" attribute (set with the set_days action).
+    Disabled by default, like the schedule's time: few use schedules.
+    """
 
     port: Port
 
     _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self, coordinator: PrimeChargerCoordinator, port: Port, part: str
@@ -127,6 +132,13 @@ class PortScheduleSwitch(ReportedSwitch):
         super().__init__(coordinator, f"{port.key}_{part}_switch", port)
         self._part = part
         self._attr_translation_key = f"schedule_{part}"
+        self._days_key = schedules.weekdays_key(port.key, part)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The schedule's weekdays ("mon" ... "sun")."""
+        days = to_weekdays((self.coordinator.data or {}).get(self._days_key))
+        return {"weekdays": days}
 
     async def _async_set(self, on: bool) -> None:
         await schedules.async_set_schedule(
@@ -208,6 +220,8 @@ class TestFeatureSwitch(ReportedSwitch):
     """
 
     _attr_entity_category = EntityCategory.CONFIG
+    # the app hides them too (a test feature menu)
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: PrimeChargerCoordinator, key: str) -> None:
         """Initialize."""

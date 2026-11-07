@@ -1,7 +1,8 @@
 """Settings of the charger that live in the Anker cloud, not on the charger.
 
 The theme catalogue, custom images, custom charging profiles, test features,
-port labels, unlocked hidden animations and the protocols allowed per power.
+port labels, unlocked hidden animations, the protocols allowed per power and
+the newest firmware offered.
 They change rarely (usually from the app), so they are read every
 REFRESH_INTERVAL, in the background: a slow or failing cloud never delays or
 fails the charger's status polls.
@@ -30,6 +31,8 @@ from .solixapi.errors import AnkerSolixError
 
 REFRESH_INTERVAL: Final = timedelta(minutes=10)
 STOCK_THEMES_INTERVAL: Final = timedelta(days=1)
+# How often the Anker cloud is asked for a newer firmware
+FIRMWARE_CHECK_INTERVAL: Final = timedelta(days=1)
 CLOUD_ERRORS: Final = (ClientError, TimeoutError, AnkerSolixError)
 
 # Protocol labels of the cloud (as seen for this charger; no Huawei) -> the
@@ -62,6 +65,7 @@ class CloudSettings:
         # +1 after each refresh: lets entities skip work when nothing was read
         self.generation = 0
         self._stock_themes_refreshed: datetime | None = None
+        self._firmware_checked: datetime | None = None
         # Unlocked hidden animations: [{"egg_type", "trigger_time", "status"}]
         self.easter_eggs: list[dict[str, Any]] | None = None
         # USB-C port ("c1") -> [(min W, max W, [protocol names])]
@@ -113,6 +117,11 @@ class CloudSettings:
             or now - self._stock_themes_refreshed >= STOCK_THEMES_INTERVAL
         ):
             reads.append(("stock themes", self._async_read_stock_themes))
+        if (
+            self._firmware_checked is None
+            or now - self._firmware_checked >= FIRMWARE_CHECK_INTERVAL
+        ):
+            reads.append(("firmware updates", self._async_check_firmware))
         for what, read in reads:
             try:
                 await read()
@@ -192,6 +201,11 @@ class CloudSettings:
             ]
         if ranges:
             self.protocol_ranges = ranges
+
+    async def _async_check_firmware(self) -> None:
+        """Whether the cloud offers a newer firmware (the library keeps it)."""
+        await self.api.get_ota_batch(deviceSns=[self.device_sn])
+        self._firmware_checked = dt_util.utcnow()
 
     async def _async_read_stock_themes(self) -> None:
         catalogue = await self.api.get_charger_screensavers(devicePn=MODEL)

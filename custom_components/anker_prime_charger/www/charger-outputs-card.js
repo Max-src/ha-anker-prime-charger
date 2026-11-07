@@ -11,6 +11,8 @@
  * A1's and A2's are the same switch (the charger switches both USB-A ports
  * together): both show its state, either turns both on or off.
  *
+ * Offline (none of its ports reports), the panels are greyed out.
+ *
  *   type: custom:anker-prime-charger-outputs-card
  *   device: <the charger's device id>   # optional: the first charger
  *   show_details: true                  # voltage and current (default true)
@@ -21,6 +23,7 @@ import { css, html } from "./lib/lit-all.js";
 import { ChargerCard } from "./card-base.js";
 import { formatNumber, portStates, readPort } from "./charger.js";
 import { defineOnce, registerCustomCard } from "./registration.js";
+import { t } from "./strings.js";
 import { sharedStyles } from "./styles.js";
 
 // Material Design's "power" icon (mdi:power), 24 x 24: drawn here, so that it
@@ -32,8 +35,8 @@ const POWER_ICON =
   "18.64,6.88 16.56,5.44M13,3H11V13H13";
 
 const PANELS = [
-  { title: "USB-C Output", usbC: true },
-  { title: "USB-A Output", usbC: false },
+  { title: "outputs.usb_c", usbC: true },
+  { title: "outputs.usb_a", usbC: false },
 ];
 
 class ChargerOutputsCard extends ChargerCard {
@@ -42,21 +45,21 @@ class ChargerOutputsCard extends ChargerCard {
   static editorSchema = [
     {
       name: "show_details",
-      label: "Show voltage and current",
+      label: "outputs.show_details",
       default: true,
       selector: { boolean: {} },
     },
     {
       name: "show_switches",
-      label: "Show on/off buttons",
-      helper: "A button next to each port. A1 and A2 share theirs: the charger turns both USB-A ports on or off together.",
+      label: "outputs.show_switches",
+      helper: "outputs.show_switches.helper",
       default: false,
       selector: { boolean: {} },
     },
     {
       name: "port_history",
-      label: "Tap a port for its history",
-      helper: "Tapping a port opens its power history; the port under the mouse is highlighted.",
+      label: "outputs.port_history",
+      helper: "outputs.port_history.helper",
       default: true,
       selector: { boolean: {} },
     },
@@ -68,6 +71,7 @@ class ChargerOutputsCard extends ChargerCard {
 
   _renderCharger(charger) {
     const ports = charger.ports.map((port) => readPort(this.hass, port));
+    const offline = ports.every((port) => port.isConnected === null);
     const switches = this._config.show_switches === true;
     // the ports each switch turns on or off: "A1 + A2" for the shared one
     const switched = (port) =>
@@ -75,10 +79,10 @@ class ChargerOutputsCard extends ChargerCard {
         .filter((other) => other.switch === port.switch)
         .map((other) => other.label)
         .join(" + ");
-    return html`<div class="panels">
+    return html`<div class="panels ${offline ? "offline" : ""}">
       ${PANELS.map(
         (panel) => html`<ha-card class=${panel.usbC ? "usb-c" : "usb-a"}>
-          <div class="title">${panel.title}</div>
+          <div class="title">${t(this.hass, panel.title)}</div>
           <div class="ports">
             ${ports
               .filter((port) => port.usb_c === panel.usbC)
@@ -94,17 +98,22 @@ class ChargerOutputsCard extends ChargerCard {
     </div>`;
   }
 
-  /** The on/off button of a port's switch (`label`: the port(s) it switches). */
+  /**
+   * The on/off button of a port's switch (`label`: the port(s) it switches):
+   * a toggle button, named after the ports (its state: pressed when on); its
+   * tooltip says what a click does.
+   */
   _renderSwitch(port, label) {
     if (!port.switch) return "";
     const on = port.isOn;
     const unknown = on === null;
-    const action = unknown ? `${label}: unknown` : `Turn ${label} ${on ? "off" : "on"}`;
+    const ports = { ports: label };
+    const action = t(this.hass, unknown ? "outputs.unknown" : on ? "outputs.turn_off" : "outputs.turn_on", ports);
     return html`<button
       class="switch ${on ? "on" : ""}"
       ?disabled=${unknown}
-      aria-pressed=${on ? "true" : "false"}
-      aria-label=${action}
+      aria-pressed=${unknown ? "mixed" : on ? "true" : "false"}
+      aria-label=${t(this.hass, "outputs.switch", ports)}
       title=${action}
       @click=${() => this._switch(port.switch, !on)}
     >
@@ -141,7 +150,7 @@ class ChargerOutputsCard extends ChargerCard {
       class="port tappable ${connected}"
       role="button"
       tabindex="0"
-      aria-label="${port.label}: power history"
+      aria-label=${t(hass, "port.history", { port: port.label })}
       @click=${() => this._showMoreInfo(port.power)}
       @keydown=${(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -152,18 +161,6 @@ class ChargerOutputsCard extends ChargerCard {
     >
       ${content}
     </div>`;
-  }
-
-  /** Open an entity's dialog, as Home Assistant's cards do. */
-  _showMoreInfo(entityId) {
-    if (!entityId) return;
-    this.dispatchEvent(
-      new CustomEvent("hass-more-info", {
-        detail: { entityId },
-        bubbles: true,
-        composed: true,
-      }),
-    );
   }
 
   static styles = [

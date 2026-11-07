@@ -123,12 +123,24 @@ function numberLocale(hass) {
   return NUMBER_LOCALES[format] || hass.locale?.language || hass.language;
 }
 
+// "<locale>|<digits>|<grouping>" -> Intl.NumberFormat (made once: slow to make)
+const formats = new Map();
+
 /** `value` with `digits` decimals in the user's number format, or "--". */
 export function formatNumber(hass, value, digits = 1) {
   if (value === null || value === undefined) return "--";
-  return new Intl.NumberFormat(numberLocale(hass), {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-    useGrouping: hass.locale?.number_format !== "none",
-  }).format(value);
+  const locale = numberLocale(hass);
+  const grouping = hass.locale?.number_format !== "none";
+  const key = `${locale}|${digits}|${grouping}`;
+  if (!formats.has(key)) {
+    formats.set(
+      key,
+      new Intl.NumberFormat(locale, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+        useGrouping: grouping,
+      }),
+    );
+  }
+  return formats.get(key).format(value);
 }

@@ -131,13 +131,14 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Entity                                                                      | What it does                                                                                    |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Total output power, Total output energy                                     | Sum of all ports (W), and the energy delivered (kWh) for the Energy dashboard                   |
-| Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and `Custom: <name>` per saved profile   |
+| Charging mode                                                               | AI power, Connection priority, Dual laptop, Low power, and each saved profile by its name       |
 | Priority ports                                                              | The one or two USB-C ports favoured in Connection priority mode                                 |
 | Automatic deactivation                                                      | Custom mode: leave it when a port set to 0 W is used                                            |
 | Maximum compatibility, Custom charging mode, Charging device identification | The app's test features (the first and last are set on the charger, as the app does)            |
 | Fast updates                                                                | Readings every second for a while (see the options)                                             |
 | Refresh                                                                     | Ask for the status now and re-read the cloud settings                                           |
 | Overheating                                                                 | On while the charger is too hot (a temperature sensor above 125 °C, until both are below 95 °C) |
+| Firmware                                                                    | The installed firmware, and a newer one the Anker cloud offers (install it in the Anker app)    |
 | Firmware update, Firmware update progress                                   | On while the charger installs a firmware update, and how far it is (%)                          |
 
 **Screen**
@@ -149,28 +150,34 @@ its on/off switch, timer, schedule and custom power limit control **both USB-A p
 | Clock screensaver start / end / days (+ days preset) | When the clock screensaver may be shown                                               |
 | Clock theme                                          | Standard Style 1-3, Anker's stock themes and your own images (`Custom - <name>`)      |
 | Time display                                         | The time over a custom image (stock themes always show it)                            |
+| Wake screen                                          | Wake the screen on its power page, as a press on the knob does                        |
 | Holiday screensaver                                  | Festive themes on holidays, chosen by the charger (the guide's _Holiday Update_)      |
 | Page                                                 | What the screen shows: Power, Clock or Off (estimated, see below)                     |
 | Hidden animation, Unlocked animations                | Event when the screen plays a hidden animation; how many are unlocked                 |
 
 **Each port** (USB-C 1-4, and USB-A for both USB-A ports)
 
-| Entity                                                | What it does                                                                                                             |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| _(the port itself)_                                   | Charging on or off                                                                                                       |
-| Power, Voltage, Current                               | Live readings. Power has the port's maximum as attribute `max_power` (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W) |
-| Energy                                                | Energy delivered (kWh), for the Energy dashboard                                                                         |
-| Connected                                             | On while a device is plugged in                                                                                          |
-| Connected device                                      | USB-C: the brand of the plugged-in device, as the charger identifies it (attributes: USB vendor and product ids)         |
-| Fault                                                 | On while the charger reports a fault on the port (USB-A: either USB-A port)                                              |
-| Label                                                 | The port's name in the Anker app                                                                                         |
-| Custom power limit                                    | The port's limit in custom mode                                                                                          |
-| Custom protocols (+ preset)                           | USB-C: optional fast-charging protocols allowed in custom mode (attribute `allowed`: what the port's power permits)      |
-| Timer, Timer duration, Timer end                      | One-off countdown that turns the port off                                                                                |
-| Schedule start / end, with time, days and days preset | Weekly on and off times                                                                                                  |
+| Entity                           | What it does                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| _(the port itself)_              | Charging on or off                                                                                                       |
+| Power, Voltage, Current          | Live readings. Power has the port's maximum as attribute `max_power` (USB-C 1 140 W, USB-C 2-4 100 W, each USB-A 22.5 W) |
+| Energy                           | Energy delivered (kWh), for the Energy dashboard                                                                         |
+| Connected                        | On while a device is plugged in                                                                                          |
+| Connected device                 | USB-C: the brand of the plugged-in device, as the charger identifies it (attributes: USB vendor and product ids)         |
+| Fault                            | On while the charger reports a fault on the port (USB-A: either USB-A port)                                              |
+| Label                            | The port's name in the Anker app                                                                                         |
+| Custom power limit               | The port's limit in custom mode                                                                                          |
+| Custom protocols (+ preset)      | USB-C: optional fast-charging protocols allowed in custom mode (attribute `allowed`: what the port's power permits)      |
+| Timer, Timer duration, Timer end | One-off countdown that turns the port off                                                                                |
+| Schedule start / end, with time  | Weekly on and off times; the days are the `weekdays` attribute (set them with **Set days**)                              |
 
 Readings, energy, Connected and Label are named after their port (**C1 power**, **C2 energy**, ...).
 On the USB-A device, they exist for **A1** and **A2** separately (**A1 power**, **A2 power**, ...).
+
+Some entities are **disabled by default**, to keep the device pages short: each port's Voltage
+and Current, Label, Custom protocols (+ preset), the port schedules (Schedule start / end and
+their times) and the three test features. Enable them on the device page (**Entities not
+shown**) when you need them.
 
 </details>
 
@@ -188,7 +195,8 @@ about **90 seconds** without a status; after an **hour** a repair under **Settin
 says so. Both clear on their own when it answers again.
 
 Custom profiles, port labels, test features and the theme list are refreshed from the cloud
-every **10 minutes**. Changes from the app may take until that refresh to appear.
+every **10 minutes**, and the firmware the cloud offers once a day. Changes from the app may take
+until that refresh to appear.
 
 In the integration's options you can change:
 
@@ -198,6 +206,10 @@ In the integration's options you can change:
 | Fast updates duration   | 10 minutes | 1-60 minutes   |
 
 Fast updates stop automatically after the selected duration. Saving options reloads the integration.
+They use the charger's real-time trigger: the one the integration knows lasts 10 seconds and is
+resent every 8 seconds; the Anker app's asks for 5 minutes. The first time, both are sent and the
+integration checks whether readings keep coming; if they do, it only sends the app's every 4.5
+minutes.
 
 ### Energy dashboard
 
@@ -234,7 +246,7 @@ Choose a mode using **Charging mode**:
 | Custom profiles     | Apply your own saved power limits and protocol settings           |
 
 Enable **Custom charging mode** (one of the app's test features) to use custom profiles.
-You can keep up to **four** profiles and select them as `Custom: <name>` in **Charging mode**.
+You can keep up to **four** profiles and select them by name in **Charging mode**.
 The actual power drawn still depends on the connected device, its battery level and cable.
 
 **Changing the charging mode, or custom power limits or protocols, briefly interrupts charging
@@ -304,10 +316,13 @@ pick what it supports.
   ends. Durations range from 1 minute to 23 hours 55 minutes; the default is 60 minutes if unset.
   Changing the duration also changes a running timer. **Timer end** shows the end time, or
   _Unknown_ when no timer is running.
-- **Schedule:** set the start/end times and days, then enable **Schedule start** and/or
-  **Schedule end**. They repeat weekly and are enabled independently.
-- **Days preset:** choose Every day, Weekdays, Weekends or None. For another combination, edit
-  the days entity or use **Set days**; the preset then shows Custom.
+- **Schedule:** enable **Schedule start** and/or **Schedule end** (disabled by default: enable
+  them on the port's device page), set their times, and choose their days with the **Set days**
+  action. They repeat weekly and are enabled independently; each one's days are its `weekdays`
+  attribute.
+- **Clock screensaver days:** choose Every day, Weekdays, Weekends or None with the days preset.
+  For another combination, edit the days entity or use **Set days**; the preset then shows
+  Custom.
 
 ### Screen and clock
 
@@ -329,6 +344,10 @@ Assistant (except a clock theme change, or turning **Clock screensaver** on or o
 for the **Timeout**. Then it shows the clock if **Clock screensaver** is on and it is within its
 hours and days, otherwise it goes dark. Turning the knob wakes it too, which Home Assistant can't
 see: then **Page** says Clock or Off while the power page shows, until the Timeout.
+
+**Wake screen** wakes it from Home Assistant (the 3D card's knob does the same). The charger has
+no command for this, so the button sends the **Timeout** as it is set, which changes nothing
+else.
 
 Your own clock images appear as `Custom - <name>` in **Clock theme**. Add, rename and delete
 them with the [clock image actions](#automations) (or in the Anker app: they show here after
@@ -374,7 +393,7 @@ loaded automatically: nothing to install or add under **Resources**.
 
 | Card                            | Shows                                                                                                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Anker Prime Charger 3D**      | The charger in 3D: the ports in use (with their cables and power) and what its screen shows; drag it to turn it, zoom in and out                             |
+| **Anker Prime Charger 3D**      | The charger in 3D: the ports in use (with their cables and power) and what its screen shows; drag it to turn it, zoom in and out; tap its knob to wake it    |
 | **Anker Prime Charger outputs** | _USB-C Output_ and _USB-A Output_: each port's power, voltage and current, and on USB-C the device's brand once identified; tap a port for its power history |
 
 To add one, edit a dashboard, choose **Add card**, and search for **Anker**. The visual editor
@@ -386,7 +405,11 @@ switches them together), and
 for the 3D card whether to **Tap a port for its history** (on by default: tapping a port, its
 power or its cable opens its power history, as on the outputs card; the port under the mouse is
 highlighted), whether to **Show zoom and turn buttons** (off by default: zoom out and in, turn
-left and right; held down, they repeat), whether to **Rotate by dragging** (on by
+left and right; held down, they repeat), what **Pressing the knob** does (**Wakes the screen**,
+the default, with [**Wake screen**](#screen-and-clock); or **Does nothing**), the **Arrows beside
+the screen** (**None**, the default, or **Brightness**: two arrows on the glass dim and brighten
+the charger's screen, 5 % a tap; taps in a row are sent as one change once you stop, and the card's
+screen shows the brightness meanwhile, then dims with it), whether to **Rotate by dragging** (on by
 default; off, the charger stays as it is shown), whether to **Show plugged-in cables** (on by
 default; off, the ports with a device are only lit), whether to **Show each port's power** (on by
 default: above each USB-C port with a device, as the charger's power page shows it, and on the
@@ -400,8 +423,9 @@ To turn the 3D card, drag it (on a touch screen, sideways: scrolling up and down
 page), or click it and use the arrow keys. To zoom, use **Ctrl** + the mouse wheel (or pinch on a
 touchpad or touch screen), or **+** and **-** (about 10 % a step); the mouse wheel alone still
 scrolls the page. Or turn on **Show zoom and turn buttons**.
-Double-click (or **Home**) goes back to the default view. A press on a port that moves turns the
-charger; one that doesn't opens the port. Each card remembers its view (angle and
+Double-click (or **Home**) goes back to the default view. A press on a port, the knob or an arrow
+that moves turns the charger; one that doesn't taps it. The knob and an arrow pulse while their
+change is on its way to the charger. Each card remembers its view (angle and
 zoom) for your Home Assistant user, so the charger is shown as you
 left it the next time, also on your other devices. (A 3D card from an earlier version gets its own
 view once opened and saved in the editor; until then it shares its charger's.) While the charger
@@ -489,6 +513,8 @@ show_port_power: true # each port's power above it (default true)
 show_cables: true # a cable in each port with a device (default true)
 port_history: true # tap a port (or its cable): its power history (default true)
 show_controls: false # zoom and turn buttons in its corner (default false)
+knob: wake # tap the knob: wake (wake the screen, default) or none
+arrows: none # arrows beside the screen: none (default) or brightness
 view_id: k3x9q2 # set by the editor: the card's own saved view
 ```
 
@@ -705,7 +731,9 @@ for hardware limits and charging-mode details.
 ## Known limitations
 
 - **Cloud only.** The charger has no local connection, so Home Assistant and the charger both
-  need internet access, and the Anker cloud must be up.
+  need internet access, and the Anker cloud must be up. It has no Matter or HomeKit support, and
+  no local network API (see [PROTOCOL.md](docs/PROTOCOL.md#not-found)). Its Bluetooth is only
+  known to work while the charger is not on Wi-Fi.
 - **The account must own the charger.** A shared account can't connect to it. One charger per
   integration entry; add the integration again for another one.
 - **Mode changes interrupt charging.** Changing the charging mode, custom settings or the port

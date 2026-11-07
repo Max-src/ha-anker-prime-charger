@@ -46,7 +46,7 @@ from .const import (
     MODEL,
     MODEL_NAME,
 )
-from .library import create_api
+from .library import async_create_api
 from .solixapi import errors
 from .solixapi.api import AnkerSolixApi
 from .solixapi.apitypes import API_SERVERS
@@ -237,7 +237,7 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
         if country := api.apisession.get_login_info("country_code"):
             data[CONF_COUNTRY] = country.upper()
 
-        default = create_api(self.hass, data).apisession.region
+        default = (await async_create_api(self.hass, data)).apisession.region
         servers = [default, *(s for s in API_SERVERS if s != default)]
         for server in servers:
             session = api.apisession
@@ -262,7 +262,7 @@ class PrimeChargerConfigFlow(ConfigFlow, domain=DOMAIN):
         self, data: dict[str, Any], server: str | None = None
     ) -> AnkerSolixApi:
         """Create an API client for the server and log in."""
-        api = create_api(self.hass, data, server)
+        api = await async_create_api(self.hass, data, server)
         # restart=True: do not reuse a cached token from the other server
         if not await api.async_authenticate(restart=True):
             raise errors.AuthorizationError("Login failed")

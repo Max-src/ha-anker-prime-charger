@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 import pytest
@@ -12,11 +14,13 @@ from pytest_homeassistant_custom_component.typing import (
     WebSocketGenerator,
 )
 
+from custom_components.anker_prime_charger import frontend
 from custom_components.anker_prime_charger.frontend import (
     CACHE_CONTROL,
     CARDS_MODULE,
     WWW,
     CardFilesView,
+    async_remove_frontend,
 )
 from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
@@ -79,6 +83,8 @@ async def test_command_gives_the_screen_entities(
         "theme": entity_id(hass, "select", "theme_id"),
         "time_display": entity_id(hass, "switch", "time_display"),
         "clock_format": entity_id(hass, "select", "clock_mode"),
+        "brightness": entity_id(hass, "number", "display_brightness"),
+        "wake": entity_id(hass, "button", "wake_screen"),
     }
 
 
@@ -185,6 +191,50 @@ async def test_screensaver_picture_unavailable(
     assert setup_entry.runtime_data.screensaver_image is None
 
 
+async def test_screensaver_picture_too_large(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,  # before the setup: its web session
+    setup_entry: MockConfigEntry,
+    hass_client: ClientSessionGenerator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Something much larger than a clock picture: not read to the end, not kept."""
+    monkeypatch.setattr(frontend, "MAX_IMAGE_SIZE", 10)
+    aioclient_mock.get(STOCK_THEME_URL, content=b"x" * 11)
+    client = await hass_client()
+    url = f"/api/anker_prime_charger/screensaver_image/{device_id(hass)}"
+    assert (await client.get(url)).status == 502
+    assert setup_entry.runtime_data.screensaver_image is None
+
+
+async def test_screensaver_picture_unexpected_error(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,  # before the setup: its web session
+    setup_entry: MockConfigEntry,
+    hass_client: ClientSessionGenerator,
+) -> None:
+    """Any failure of the download: a bad gateway, not a server error."""
+    aioclient_mock.get(STOCK_THEME_URL, exc=ValueError("unexpected"))
+    client = await hass_client()
+    url = f"/api/anker_prime_charger/screensaver_image/{device_id(hass)}"
+    assert (await client.get(url)).status == 502
+
+
+async def test_screensaver_picture_downloaded_once(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,  # before the setup: its web session
+    setup_entry: MockConfigEntry,
+    hass_client: ClientSessionGenerator,
+) -> None:
+    """Two cards asking at once: one download."""
+    aioclient_mock.get(STOCK_THEME_URL, content=b"stock")
+    client = await hass_client()
+    url = f"/api/anker_prime_charger/screensaver_image/{device_id(hass)}"
+    responses = await asyncio.gather(client.get(url), client.get(url))
+    assert [resp.status for resp in responses] == [200, 200]
+    assert aioclient_mock.call_count == 1
+
+
 async def test_command_without_device_gives_the_first_charger(
     hass: HomeAssistant,
     setup_entry: MockConfigEntry,
@@ -254,6 +304,7 @@ async def test_every_card_file_exists() -> None:
         "charger-outputs-card.js",
         "registration.js",
         "screensaver-store.js",
+        "strings.js",
         "styles.js",
         "lib/lit-all.js",
     ):
@@ -274,3 +325,20 @@ async def test_cards_are_a_dashboard_resource_until_removed(
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert CARDS_MODULE not in [item["url"] for item in resources.async_items()]
+
+
+async def test_injected_cards_are_removed_with_the_last_charger(
+    hass: HomeAssistant,
+) -> None:
+    """Resources in YAML: the module injected in the page goes too."""
+    from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, UrlManager
+
+    changes: list[tuple[str, str]] = []
+    hass.config.components.add("frontend")
+    hass.data[DATA_EXTRA_MODULE_URL] = UrlManager(
+        lambda change, url: changes.append((change, url)), [CARDS_MODULE]
+    )
+    await async_remove_frontend(hass)
+    assert CARDS_MODULE not in hass.data[DATA_EXTRA_MODULE_URL].urls
+    await async_remove_frontend(hass)  # not there any more: nothing to do
+    assert changes == [("removed", CARDS_MODULE)]

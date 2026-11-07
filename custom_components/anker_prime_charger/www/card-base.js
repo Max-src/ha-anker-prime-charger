@@ -11,7 +11,8 @@
  * - the visual editor (static editorSchema and completeConfig, see
  *   card-editor.js) and the stub config of a new card (the first charger,
  *   completed);
- * - its size in dashboards (static cardSize, gridRows).
+ * - its size in dashboards (static cardSize, gridRows);
+ * - opening an entity's dialog (_showMoreInfo).
  */
 import { LitElement, html } from "./lib/lit-all.js";
 import { loadCharger } from "./charger.js";
@@ -124,6 +125,14 @@ export class ChargerCard extends LitElement {
     }
     if (!this._charger) return html`<ha-card class="loading"></ha-card>`;
     return this._renderCharger(this._charger);
+  }
+
+  /** Open an entity's dialog (a port's power: its history), as Home Assistant's cards do. */
+  _showMoreInfo(entityId) {
+    if (!entityId) return;
+    this.dispatchEvent(
+      new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }),
+    );
   }
 
   getCardSize() {

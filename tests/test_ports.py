@@ -83,8 +83,14 @@ async def test_port_schedule(
     """Each start or end is sent whole: on/off, time and weekdays."""
     assert state(hass, "switch", "usba_start_switch") == STATE_ON
     assert state(hass, "time", "usba_start_time") == "07:30:00"
-    days = entity_id(hass, "text", "usba_start_weekdays")
-    assert hass.states.get(days).state == "mon,tue,wed,thu,fri"
+    switch = entity_id(hass, "switch", "usba_start_switch")
+    assert attr(hass, "switch", "usba_start_switch", "weekdays") == [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+    ]
 
     await call(
         hass,
@@ -105,10 +111,12 @@ async def test_port_schedule(
     assert cloud.mqtt.published_types[-1] == "0208"
     assert state(hass, "time", "usba_start_time") == "08:15:00"
 
-    await call(hass, "text", "set_value", days, value="sat,sun")
+    await act(
+        hass, "set_days", device_id(hass, "usba"), schedule="start", days=["sat", "sun"]
+    )
     assert commands[-1][1]["set_port_time_weekdays"] == ["sat", "sun"]
     assert commands[-1][1]["set_port_time_hour"] == 8
-    assert hass.states.get(days).state == "sat,sun"
+    assert hass.states.get(switch).attributes["weekdays"] == ["sat", "sun"]
 
     await call(
         hass, "switch", "turn_on", entity_id(hass, "switch", "usbc_3_end_switch")
@@ -128,15 +136,13 @@ async def test_schedule_days_preset(
     hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
 ) -> None:
     """The preset shows the reported days, "custom" for other sets, and sets them."""
-    preset = entity_id(hass, "select", "usba_start_weekdays_preset")
-    days = entity_id(hass, "text", "usba_start_weekdays")
+    preset = entity_id(hass, "select", "clock_display_weekdays_preset")
+    days = entity_id(hass, "text", "clock_display_weekdays")
     assert hass.states.get(preset).state == "weekdays"
-    assert state(hass, "select", "usbc_1_end_weekdays_preset") == "none"
 
     await call(hass, "select", "select_option", preset, option="weekends")
-    assert commands[-1][0] == "usba_start_time"
-    assert commands[-1][1]["set_port_time_weekdays"] == ["sat", "sun"]
-    assert commands[-1][1]["set_port_time_hour"] == 7
+    assert commands[-1][0] == "clock_display_schedule"
+    assert commands[-1][1]["set_clock_display_weekdays"] == ["sat", "sun"]
     assert hass.states.get(days).state == "sat,sun"
 
     await call(hass, "text", "set_value", days, value="mon,wed")
@@ -164,7 +170,7 @@ async def test_schedule_days_custom_is_restored(
     eid = (
         er.async_get(hass)
         .async_get_or_create(
-            "select", DOMAIN, f"{SN}_usba_start_weekdays_preset", config_entry=entry
+            "select", DOMAIN, f"{SN}_clock_display_weekdays_preset", config_entry=entry
         )
         .entity_id
     )
@@ -172,20 +178,40 @@ async def test_schedule_days_custom_is_restored(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     # the fixture's days are Monday to Friday, which is otherwise "weekdays"
-    assert state(hass, "select", "usba_start_weekdays_preset") == "custom"
-    assert state(hass, "select", "usba_end_weekdays_preset") == "none"
+    assert hass.states.get(eid).state == "custom"
+
+
+async def test_port_weekdays_entities_are_retired(
+    hass: HomeAssistant, cloud: FakeCloud, entry: MockConfigEntry
+) -> None:
+    """A port schedule's days text and preset of earlier versions are removed."""
+    registry = er.async_get(hass)
+    old = [
+        registry.async_get_or_create(
+            platform, DOMAIN, f"{SN}_usbc_2_end_{unique}", config_entry=entry
+        )
+        for platform, unique in (("text", "weekdays"), ("select", "weekdays_preset"))
+    ]
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert [registry.async_get(e.entity_id) for e in old] == [None, None]
+    # the clock screen's days stay
+    assert registry.async_get_entity_id("text", DOMAIN, f"{SN}_clock_display_weekdays")
 
 
 async def test_set_days_action(
     hass: HomeAssistant, setup_entry: MockConfigEntry, commands: list
 ) -> None:
     """Set days: a port's schedule start or end, or the charger's clock display."""
-    days = entity_id(hass, "text", "usbc_2_end_weekdays")
     port = device_id(hass, "usbc_2")
     await act(hass, "set_days", port, schedule="end", days=["fri", "mon", "wed"])
     assert commands[-1][0] == "usbc_2_end_time"
     assert commands[-1][1]["set_port_time_weekdays"] == ["mon", "wed", "fri"]
-    assert hass.states.get(days).state == "mon,wed,fri"
+    assert attr(hass, "switch", "usbc_2_end_switch", "weekdays") == [
+        "mon",
+        "wed",
+        "fri",
+    ]
 
     await act(hass, "set_days", port, schedule="end")
     assert commands[-1][1]["set_port_time_weekdays"] == []
@@ -340,33 +366,100 @@ async def test_custom_protocols_all_needs_the_table(
     assert len(commands) == sent
 
 
+async def _tick(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, seconds: int
+) -> None:
+    freezer.tick(timedelta(seconds=seconds))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
+def _triggers(cloud: FakeCloud) -> list[str]:
+    """The real-time triggers sent: 020b (10 s) and 0057 (with a duration)."""
+    return [t for t in cloud.mqtt.published_types if t in ("020b", "0057")]
+
+
 async def test_fast_updates(
     hass: HomeAssistant,
     cloud: FakeCloud,
     setup_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    """Fast updates resend the real-time trigger every 8 s until turned off."""
+    """A charger that ignores 0057's duration: 020b every 8 s until turned off."""
     eid = entity_id(hass, "switch", "fast_updates")
     assert hass.states.get(eid).state == STATE_OFF
 
-    def triggers() -> int:
-        return cloud.mqtt.published_types.count("020b")
-
     await call(hass, "switch", "turn_on", eid)
     assert hass.states.get(eid).state == STATE_ON
-    assert triggers() == 1
-    freezer.tick(timedelta(seconds=8))
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
-    assert triggers() == 2
+    assert _triggers(cloud) == ["0057", "020b"]
+    await _tick(hass, freezer, 8)  # 020b is let run out once
+    assert _triggers(cloud) == ["0057", "020b"]
+    await _tick(hass, freezer, 8)  # no values after it: 0057 doesn't work
+    assert _triggers(cloud) == ["0057", "020b", "020b"]
+    await _tick(hass, freezer, 8)
+    assert _triggers(cloud) == ["0057", "020b", "020b", "020b"]
 
     await call(hass, "switch", "turn_off", eid)
     assert hass.states.get(eid).state == STATE_OFF
-    freezer.tick(timedelta(seconds=16))
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
-    assert triggers() == 2
+    await _tick(hass, freezer, 16)
+    assert _triggers(cloud) == ["0057", "020b", "020b", "020b"]
+
+    # known now: next time 020b only
+    await call(hass, "switch", "turn_on", eid)
+    assert _triggers(cloud)[-1:] == ["020b"]
+    assert _triggers(cloud).count("0057") == 1
+
+
+async def test_fast_updates_with_a_duration(
+    hass: HomeAssistant,
+    cloud: FakeCloud,
+    setup_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A charger that keeps the values coming for 0057's 300 s: resent every 270 s."""
+    eid = entity_id(hass, "switch", "fast_updates")
+
+    async def live(seconds: int) -> None:
+        # the charger's live values, once a second
+        for _ in range(seconds):
+            freezer.tick(timedelta(seconds=1))
+            cloud.mqtt.deliver({"usbc_1_power": 9.0}, message="0303")
+            async_fire_time_changed(hass)
+            await hass.async_block_till_done()
+
+    await call(hass, "switch", "turn_on", eid)
+    assert _triggers(cloud) == ["0057", "020b"]
+    await live(16)  # 020b ran out, values still come: 0057 works
+    assert _triggers(cloud) == ["0057", "020b"]
+    assert setup_entry.runtime_data.fast_updates.timed_trigger_works is True
+    await live(250)
+    assert _triggers(cloud) == ["0057", "020b"]
+    await live(16)  # 270 s after the first
+    assert _triggers(cloud) == ["0057", "020b", "0057"]
+
+    # turned off: the duration is ended (a2 0)
+    await call(hass, "switch", "turn_off", eid)
+    assert _triggers(cloud)[-1] == "0057"
+    assert last_command_field(cloud, "a2") == "0100"  # type 01, off
+
+
+async def test_fast_updates_fall_back_when_values_stop(
+    hass: HomeAssistant,
+    cloud: FakeCloud,
+    setup_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Values that stop while 0057 alone is sent: back to 020b."""
+    eid = entity_id(hass, "switch", "fast_updates")
+    fast = setup_entry.runtime_data.fast_updates
+    fast.timed_trigger_works = True  # learnt earlier
+    await call(hass, "switch", "turn_on", eid)
+    assert _triggers(cloud) == ["0057"]
+    await _tick(hass, freezer, 8)  # values may take a few seconds to start
+    assert _triggers(cloud) == ["0057"]
+    await _tick(hass, freezer, 8)  # none at all
+    assert _triggers(cloud) == ["0057", "020b"]
+    assert fast.timed_trigger_works is False
 
 
 async def test_hidden_animation(

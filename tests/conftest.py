@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Generator
 import copy
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -28,9 +28,12 @@ from custom_components.anker_prime_charger.solixapi.api import AnkerSolixApi
 from custom_components.anker_prime_charger.solixapi.apitypes import API_ENDPOINTS
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import Entity
 
 SN = "ASHV911G00000001"
 EMAIL = "user@example.com"
+# the account's user id (the app sends it to the charger)
+USER_ID = "0123456789abcdef0123456789abcdef01234567"
 PASSWORD = "secret-password"
 
 DEVICE = {
@@ -206,6 +209,18 @@ def _port_setting(name: str, power: int, max_power: int, **protocols: int) -> di
 
 # Anker cloud REST answers (only the "data" part), by endpoint key (or path)
 CLOUD = {
+    # the newest firmware the cloud offers (none newer)
+    "get_ota_batch": {
+        "update_infos": [
+            {
+                "device_sn": SN,
+                "need_update": False,
+                "lastPackage": {"version": ""},
+                "current_version": "v2.1.1.6",
+                "children": None,
+            }
+        ]
+    },
     "charger_get_device_setting": {
         "device_setting": {
             "charging_mode_status": 0,
@@ -347,6 +362,24 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Allow loading custom_components in all tests."""
 
 
+@pytest.fixture(autouse=True)
+def enable_all_entities(request: pytest.FixtureRequest) -> Generator[None]:
+    """Create every entity enabled, also those disabled by default.
+
+    Tests marked default_entities get the integration's own defaults.
+    """
+    if request.node.get_closest_marker("default_entities"):
+        yield
+        return
+    with patch.object(
+        Entity,
+        "entity_registry_enabled_default",
+        new_callable=PropertyMock,
+        return_value=True,
+    ):
+        yield
+
+
 class FakeMqttSession:
     """Stands in for the library's AnkerSolixMqttSession and the charger."""
 
@@ -355,6 +388,8 @@ class FakeMqttSession:
         self.host = "mqtt.example.com"
         self.port = 8883
         self.connected = True
+        # paho client of the real session (None: stopping it is skipped)
+        self.client: Any = None
         self.subscriptions: set[str] = set()
         # paho's error code for the next subscription (0: success)
         self.subscribe_error = 0
@@ -367,18 +402,21 @@ class FakeMqttSession:
         self.mqtt_stats = MagicMock()
         self.mqtt_stats.asdict.side_effect = lambda: {"start_time": None}
 
-    def deliver(self, values: dict[str, Any]) -> None:
+    def deliver(self, values: dict[str, Any], message: str = "0a00") -> None:
         """Deliver decoded message values the way the real session does.
 
         Unlike pending_reply, this goes through the registered message callback
         and the library's own cache update (which drops keys it doesn't know).
+        `message`: the message type ("0303": live port values).
         """
         self.mqtt_data[SN] = (
             (self.mqtt_data.get(SN) or {})
             | values
             | {"last_message": "2099-01-01 00:00:00"}
         )
-        self.message_callback(self, "dt/x", {}, b"", "A2345", SN, values)
+        # the message's header (prefix, length, pattern, type)
+        data = bytes.fromhex(f"ff090a00030f0f{message}")
+        self.message_callback(self, "dt/x", {}, data, "A2345", SN, values)
 
     @property
     def published_types(self) -> list[str]:
@@ -478,6 +516,8 @@ class FakeCloud:
 
     def _clock_image_request(self, key: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Custom clock image endpoints, like the Anker cloud (see clock_images.py)."""
+        if isinstance(error := self.rest.get(key), Exception):
+            raise error
         images = self.rest["charger_get_manual_screensavers"]["list"]
         ok = {"code": 0, "msg": "success!", "data": {}}
         if key.endswith("get_app_up_token_general"):
@@ -522,6 +562,11 @@ class FakeCloud:
         """The MQTT session of the most recent API client."""
         return self.api.mqttsession
 
+    async def async_create_api(
+        self, hass: HomeAssistant, data: dict[str, Any], server: str | None = None
+    ) -> AnkerSolixApi:
+        return self.create_api(hass, data, server)
+
     def create_api(
         self, hass: HomeAssistant, data: dict[str, Any], server: str | None = None
     ) -> AnkerSolixApi:
@@ -532,7 +577,10 @@ class FakeCloud:
         async def authenticate(restart: bool = False) -> bool:
             if self.auth_error:
                 raise self.auth_error
-            api.apisession._login_response = {"country_code": self.account_country}
+            api.apisession._login_response = {
+                "country_code": self.account_country,
+                "user_id": USER_ID,
+            }
             return True
 
         async def get_bind_devices(fromFile: bool = False) -> dict:
@@ -571,10 +619,13 @@ def cloud() -> Generator[FakeCloud]:
     """Patch the API factory used by setup and the config flow."""
     fake = FakeCloud()
     with (
-        patch("custom_components.anker_prime_charger.create_api", fake.create_api),
         patch(
-            "custom_components.anker_prime_charger.config_flow.create_api",
-            fake.create_api,
+            "custom_components.anker_prime_charger.async_create_api",
+            fake.async_create_api,
+        ),
+        patch(
+            "custom_components.anker_prime_charger.config_flow.async_create_api",
+            fake.async_create_api,
         ),
         patch(
             "custom_components.anker_prime_charger.coordinator.FIRST_DATA_TIMEOUT", 0.1
