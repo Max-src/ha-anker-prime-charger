@@ -87,6 +87,11 @@ after updating the library. `tests/test_command_bytes.py` checks that the librar
 command the integration sends byte for byte as before (`tests/command_bytes.json`, checked on a
 real charger).
 
+`manifest.json` `requirements` may only list packages Home Assistant doesn't depend on itself:
+Hassfest (`.github/workflows/validate.yml`) refuses one it does (Pillow, for example: it comes with
+Home Assistant). Its pins in `package_constraints.txt` (paho-mqtt, aiofiles) are fine.
+`tests/test_quality.py` checks this locally.
+
 CI (`.github/workflows/tests.yml`) runs the tests against three Home Assistant versions, each
 pinned by a `pytest-homeassistant-custom-component` release: **minimum** (the version in
 `hacs.json`) and **stable** (the latest release) must pass; **latest** (often a beta) is an early

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 import importlib
+import importlib.metadata
 import json
 from pathlib import Path
 import re
@@ -149,3 +150,30 @@ def test_translations_contain_no_html() -> None:
     """Hassfest rejects angle-bracket text in translation strings."""
     strings = (COMPONENT / "translations" / "en.json").read_text(encoding="utf-8")
     assert not re.findall(r"<[^>\n]*>", strings)
+
+
+def _package(requirement: str) -> str:
+    """A requirement's package name, normalized ("Pillow==12.3.0" -> "pillow")."""
+    name = re.split(r"[\s<>=!~;\[]", requirement, maxsplit=1)[0]
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def test_manifest_requirements_are_not_home_assistant_dependencies() -> None:
+    """Hassfest refuses a requirement Home Assistant itself depends on (Pillow, ...).
+
+    Those come with Home Assistant; only its pins (package_constraints.txt,
+    e.g. paho-mqtt) may be listed.
+    """
+    manifest = json.loads(
+        (
+            Path(__file__).parents[1] / "custom_components" / DOMAIN / "manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    core = {
+        _package(requirement)
+        for requirement in importlib.metadata.requires("homeassistant") or []
+        if "extra ==" not in requirement
+    }
+    assert core, "Home Assistant's dependencies not found"
+    listed = [r for r in manifest["requirements"] if _package(r) in core]
+    assert listed == []
